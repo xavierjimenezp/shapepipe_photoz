@@ -12,7 +12,7 @@
 
 [Shapepipe](https://github.com/CosmoStat/shapepipe) extension to preprocess individual tile output catalogs and compute photometric redshifts with different machine learning methods.
 
-Currently supports UNIONS and CFIS_PS3pi tiles.
+Currently supports UNIONS and PS3pi_CFIS tiles.
 
 Photometric redshift functionalities are available for all catalogs. Please refer to section **Usage** for input files format.
 
@@ -43,23 +43,23 @@ Install the code:
 WIP add a few cat-___.___.fits files for quick example
 ## Preprocessing
 
-`python photoz.py --nodes 1 --survey cfis_ps3pi --clean True --input example/params_cfis_ps3pi`
+`python photoz.py --nodes 1 --survey ps3pi_cfis --clean True --input example/params_ps3pi_cfis`
 
-`python photoz.py --nodes 1 --survey cfis_ps3pi --make True --input example/params_cfis_ps3pi`
+`python photoz.py --nodes 1 --survey ps3pi_cfis --make True --input example/params_ps3pi_cfis`
 
-`python photoz.py --nodes 1 --survey cfis_ps3pi --join True --input example/params_cfis_ps3pi`
+`python photoz.py --nodes 1 --survey ps3pi_cfis --join True --input example/params_ps3pi_cfis`
 
-`python photoz.py --nodes 1 --survey cfis_ps3pi --plot True --input example/params_cfis_ps3pi`
+`python photoz.py --nodes 1 --survey ps3pi_cfis --plot True --input example/params_ps3pi_cfis`
 
 ## Machine learning algorithms
 
-The following command runs the **random forest** (RF) algorithm with default hyperparameters through the catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv  catalog using the example/params_cfis_ps3pi.py config file.
+The following command runs the **random forest** (RF) algorithm with default hyperparameters through the catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv  catalog using the example/params_ps3pi_cfis.py config file.
 
-`python photoz.py --nodes 1 --survey cfis_ps3pi --learning True --algorithm RF --input example/params_cfis_ps3pi`
+`python photoz.py --nodes 1 --survey ps3pi_cfis --learning True --algorithm RF --input example/params_ps3pi_cfis`
 
 The following command optimizes the RF hyperparameters using [HyperOpt](https://github.com/hyperopt/hyperopt) with a pre-defined parameter grid.
 
-`python photoz.py --nodes 1 --survey cfis_ps3pi --optimize True --algorithm RF --input example/params_cfis_ps3pi`
+`python photoz.py --nodes 1 --survey ps3pi_cfis --optimize True --algorithm RF --input example/params_ps3pi_cfis`
 
 Both commands output files in the output/unions/[figures, files] directories. See **Usage** for more details.
 
