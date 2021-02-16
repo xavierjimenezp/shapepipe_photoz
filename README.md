@@ -1,8 +1,8 @@
+<image src="Cosmostat_logo.png" width="250" align="left"/>
 # Shapepipe PhotoZ 
 
 [![travis](https://camo.githubusercontent.com/2d96c42159599cd00db0db2d45b6f4884da049af9cc16fee8ba68d531d6bb28e/68747470733a2f2f7472617669732d63692e636f6d2f436f736d6f537461742f7368617065706970652e7376673f6272616e63683d6d6173746572)](https://travis-ci.com/CosmoStat/shapepipe) [![python35](https://camo.githubusercontent.com/8c2717c22bf2c14eea589cc3f199ceb70e7176f4b1afc2a177a3f36c716910a4/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f707974686f6e2d332e352d79656c6c6f772e737667)](https://www.python.org/)  [![python36](https://camo.githubusercontent.com/6b522695ff1ef1af03d049f66348ce5c1f09f6bab606522ccb1a8d27142f7b95/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f707974686f6e2d332e362d79656c6c6f772e737667)](https://www.python.org/) [![python37](https://camo.githubusercontent.com/e770ba34ca059770c9cf01c46dd567c3e0574e99d8afaf8e6179e55f432129c7/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f707974686f6e2d332e372d79656c6c6f772e737667)](https://www.python.org/)
 
-<image src="Cosmostat_logo.png" width="250" align="left"/>
 
 |Version         |Date                          |
 |----------------|-------------------------------|
