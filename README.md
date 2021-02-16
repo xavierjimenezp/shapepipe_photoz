@@ -103,7 +103,7 @@ Input parameters are found in `params.py`. The following parameters are required
 > 
 > **Note 2**: please ensure that the paste_cat_runner was the last Shapepipe module to run. Otherwise, PhotoZ won't read the correct file.
 > 
-> **Note 3**: path to paste_cat_runner is defined as `path_to_tile_run/spectral_survey/output/` where spectral_survey is in spectral_surveys
+> **Note 3**: path to paste_cat_runner is defined as `path_to_tile_run/SURVNAME/spectral_survey/output/` where SURVNAME is either 'unions' or 'ps3pi_cifs' and spectral_survey is in spectral_surveys.
 
 ### Machine learning algorithms
 Input parameters are found in `params.py`. The following parameters are required for photometric redshift calculation:
