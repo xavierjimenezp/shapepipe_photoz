@@ -17,7 +17,7 @@ Currently supports UNIONS and CFIS_PS3PI tiles.
 Photometric redshift functionalities are available for all catalogs. Please refer to section **Usage** for input files format.
 
 # Disclaimer
-PhotoZ is currentlty under early developement and may contain bugs or instabilities. 
+PhotoZ is currentlty under early development and may contain bugs or instabilities. 
 
 # Installation 
 Clone or download the PhotoZ repository:
