@@ -53,7 +53,7 @@ WIP
 
 ## Machine learning algorithms
 
-The following command runs the **random forest** (RF) algorithm through the catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv  catalog using the example/params_unions.py config file.
+The following command runs the **random forest** (RF) algorithm with default hyperparameters through the catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv  catalog using the example/params_unions.py config file.
 
 `python photoz.py --nodes 1 --survey unions --learning True --algorithm RF --input example/params_unions`
 
