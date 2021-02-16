@@ -15,6 +15,7 @@ import os
 import shutil
 import glob
 import pandas as pd
+import importlib
 import matplotlib.pyplot as plt
 import matplotlib.style as style
 import seaborn as sns
@@ -114,27 +115,30 @@ class GenerateFiles(object):
             print ("Successfully created the directory %s " % path_to_file)
 
 
-    def make_directories(self):
+    def make_directories(self, output=False):
         """[summary]
         """
 
-        self.make_directory(self.temp_path + self.survey)
+        if output == False:
 
-        temp_directories = ['matched', 'unmatched', 'vignet', 'spectral_surveys', 'd2d', 'redshift']
+            self.make_directory(self.temp_path + self.survey)
 
-        for temp_name in temp_directories:
-            self.make_directory(self.temp_path + self.survey + '/' + temp_name)
+            temp_directories = ['matched', 'unmatched', 'vignet', 'spectral_surveys', 'd2d', 'redshift']
 
-        for band in self._bands:
-            self.make_directory(self.temp_path + self.survey + '/vignet/' + band)
+            for temp_name in temp_directories:
+                self.make_directory(self.temp_path + self.survey + '/' + temp_name)
 
-        self.make_directory(self.temp_path + self.survey + '/vignet/array')
+            for band in self._bands:
+                self.make_directory(self.temp_path + self.survey + '/vignet/' + band)
 
-        self.make_directory(self._path + 'output')
-        self.make_directory(self._path + 'output/' + self.survey)
-        self.make_directory(self._path + 'output/' + self.survey + '/files')
-        self.make_directory(self._path + 'output/' + self.survey + '/files/ML')
-        self.make_directory(self._path + 'output/' + self.survey + '/figures')
+            self.make_directory(self.temp_path + self.survey + '/vignet/array')
+
+        elif output == True:
+            self.make_directory(self._path + 'output')
+            self.make_directory(self._path + 'output/' + self.survey)
+            self.make_directory(self._path + 'output/' + self.survey + '/files')
+            self.make_directory(self._path + 'output/' + self.survey + '/files/ML')
+            self.make_directory(self._path + 'output/' + self.survey + '/figures')
 
 
 
@@ -1809,6 +1813,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--learning", required=False, type=bool, nargs="?", const=False)
     parser.add_argument("-o", "--optimize", required=False, type=bool, nargs="?", const=False)
     parser.add_argument("-a", "--algorithm", required=False, type=str, nargs="?", const='SVR')
+    parser.add_argument("-i", "--input", required=False, type=str, nargs="?", const='params')
 
     args = parser.parse_args()
 
@@ -1816,25 +1821,19 @@ if __name__ == "__main__":
 # # # # # PS3PI # # # # #
 #------------------------------------------------------------------#
 
-    global path
     path = os.getcwd() + '/'
+    params = importlib.import_module(args.input)
 
     if args.survey == 'test':
         print('Modules loaded properly')
+        print(params.temp_path)
 
-    elif args.survey == 'ps3pi_cfis':
+    elif args.survey == 'ps3pi_cfis' or args.survey == 'unions':
         
-        spectral_path = '/home/jimenez/spectral_catalogs/'
-        spectral_names = ['alldeep.egs.uniq.2012jun13']
-
-        out_dir = os.listdir("/n17data/jimenez/shaperun/morpho/output/")[-1]
-        paste_dir = os.listdir('/n17data/jimenez/shaperun/morpho/output/%s/paste_cat_runner/output/'%(out_dir))
-        input_path = '/n17data/jimenez/shaperun/morpho/output/%s/paste_cat_runner/output/'%(out_dir)
-
-        output_name = 'CFIS_matched_deep_2_3_catalog_R'
-        temp_path = '/n17data/jimenez/temp/'
-
-        bands = ['R']
+        bands = params.bands
+        output_path = params.output_path
+        output_name = params.output_name
+        temp_path = params.temp_path
 
         #------------------------------------------------------------------#
         # # # # # CLEAN # # # # #
@@ -1850,9 +1849,27 @@ if __name__ == "__main__":
         #------------------------------------------------------------------#
 
         elif args.make == True:
+            spectral_path = params.spectral_path
+            spectral_names = params.spectral_names
+            path_to_tile_run = params.path_to_tile_run
+            spectral_surveys = params.spectral_surveys
+            vignet = params.vignet
+
+
             cat = MakeCatalogs(args.survey, bands, temp_path)
-            cat.make_survey_catalog(spectral_path, spectral_names[0])
-            Parallel(n_jobs=args.nodes)(delayed(cat.make_catalog)(p, paste_dir, input_path, spectral_names[0], vignet=True) for p in tqdm(range(len(paste_dir))))
+
+            for i in range(len(spectral_names)):
+                cat.make_survey_catalog(spectral_path, spectral_names[i])
+                if params.input_path == False:
+                    out_dir = os.listdir(path_to_tile_run + args.survey + '/%s/output/'%(spectral_surveys[i]))[-1]
+                    # paste_dir = os.listdir('/n17data/jimenez/shaperun_unions/output_%s/%s/paste_cat_runner/output/'%(spectral_surveys[i], out_dir))
+                    # input_path = '/n17data/jimenez/shaperun_unions/output_%s/%s/paste_cat_runner/output/'%(spectral_surveys[i], out_dir)
+                    input_path = path_to_tile_run + args.survey + '/%s/output/%s/paste_cat_runner/output/'%(spectral_surveys[i], out_dir)
+                else:
+                    input_path = params.input_path
+                paste_dir = os.listdir(input_path)
+                Parallel(n_jobs=args.nodes)(delayed(cat.make_catalog)(p, paste_dir, input_path, spectral_names[i], vignet=vignet) for p in tqdm(range(len(paste_dir))))
+
 
         #------------------------------------------------------------------#
         # # # # # JOIN INDIVIDUAL TILE CATALOGS # # # # #
@@ -1867,6 +1884,7 @@ if __name__ == "__main__":
         #------------------------------------------------------------------#
 
         elif args.plot == True:
+            spectral_names = params.spectral_names
             GenPlot = GeneratePlots(args.survey, bands, temp_path, csv_name=output_name, spectral_names=spectral_names)
             # GenPlot.plot_d2d()
             # GenPlot.plot_matched_r_i_i_z()
@@ -1881,7 +1899,11 @@ if __name__ == "__main__":
         #------------------------------------------------------------------#
 
         elif args.learning == True:
-            path_to_csv = path + 'catalogs/' + 'MediumDeep_CFHT_CFIS_R_matched_catalog_2' + '.csv'
+
+            GenFiles = GenerateFiles(args.survey, bands, path)
+            GenFiles.make_directories(output=True)
+
+            path_to_csv = params.path_to_csv
          
             ML = LearningAlgorithms(args.survey, bands, path_to_csv, output_name)
             ML.plot_corrmat()
@@ -1906,8 +1928,8 @@ if __name__ == "__main__":
 
         elif args.optimize == True:
 
-            path_to_csv = path + 'catalogs/' + 'MediumDeep_CFHT_CFIS_R_matched_catalog_2' + '.csv'
-            max_evals = 10
+            path_to_csv = params.path_to_csv
+            max_evals = params.max_evals
 
             algs = {'RF': RandomForestOptimizer, 'SVR': SVROptimizer, 'XGB': XGBoostOptimizer, 'KRR': KRROptimizer, 'ANN': ANNOptimizer}
             try:
@@ -1948,7 +1970,8 @@ if __name__ == "__main__":
 # # # # # UNIONS # # # # #
 #------------------------------------------------------------------#
 
-    elif args.survey == 'unions':
+    elif args.survey == 'unions_deprecated':
+
         spectral_path = '/home/mkilbing/astro/data/CFIS/spectro_surveys/'
         spectral_names = ['data_DR14_LRG_N', 'data_DR14_LRG_S', 'galaxy_DR12v5_CMASSLOWZTOT_North', 'galaxy_DR12v5_CMASSLOWZTOT_South','sdss_main_gal']
         # spectral_names = ['sdss_main_gal']
@@ -1958,10 +1981,17 @@ if __name__ == "__main__":
 
         output_name = 'CFIS_matched_eBOSS_SDSS_catalog_RUIZ'
         # output_name = 'CFIS_matched_SDSS_2_catalog_RUIZ'
+        output_path = path
 
         temp_path = '/n17data/jimenez/temp/'
 
         bands = ['R', 'U', 'I', 'Z']
+
+        # out_dir = os.listdir("/n17data/jimenez/shaperun_unions/output_%s/"%(spectral_surveys[i]))[-1]
+        # path_to_tile_run = '/n17data/jimenez/shaperun/'
+        # input_path = path_to_tile_run + args.survey + '/%s/output/%s/paste_cat_runner/output/'%(spectral_surveys[i], out_dir)
+        # paste_dir = os.listdir(input_path)
+        
 
 
         if args.clean == True:
@@ -1973,10 +2003,10 @@ if __name__ == "__main__":
             cat = MakeCatalogs(args.survey, bands, temp_path)
             # vignet = [False, False, False, False, False]
             for i in range(len(spectral_names)):
+                cat.make_survey_catalog(spectral_path, spectral_names[i])
                 out_dir = os.listdir("/n17data/jimenez/shaperun_unions/output_%s/"%(spectral_surveys[i]))[-1]
                 paste_dir = os.listdir('/n17data/jimenez/shaperun_unions/output_%s/%s/paste_cat_runner/output/'%(spectral_surveys[i], out_dir))
                 input_path = '/n17data/jimenez/shaperun_unions/output_%s/%s/paste_cat_runner/output/'%(spectral_surveys[i], out_dir)
-                cat.make_survey_catalog(spectral_path, spectral_names[i])
                 Parallel(n_jobs=args.nodes)(delayed(cat.make_catalog)(p, paste_dir, input_path, spectral_names[i], vignet=False) for p in tqdm(range(len(paste_dir))))
 
         elif args.join == True:
