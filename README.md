@@ -10,7 +10,7 @@
 |0.0.1|16/02/2021            |
 
 
-[Shapepipe](https://github.com/CosmoStat/shapepipe) extension to preprocess shapepipe individual tile output catalogs and compute photometric redshifts with different methods.
+[Shapepipe](https://github.com/CosmoStat/shapepipe) extension to preprocess individual tile output catalogs and compute photometric redshifts with different methods.
 
 Currently supports UNIONS and CFIS_PS3PI tiles.
 
@@ -37,9 +37,30 @@ Install the code:
 
 # Examples
 WIP
-# Algorithms
+## Preprocessing
+
+`python photoz.py --nodes 1 --survey unions --clean True --input example/params_unions`
+
+`python photoz.py --nodes 1 --survey unions --make True --input example/params_unions`
+
+`python photoz.py --nodes 1 --survey unions --join True --input example/params_unions`
+
+`python photoz.py --nodes 1 --survey unions --plot True --input example/params_unions`
+
+## Machine learning algorithms
+
+The following command runs the **random forest** (RF) algorithm through the catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv  catalog using the example/params_unions.py config file.
+
+`python photoz.py --nodes 1 --survey unions --learning True --algorithm RF --input example/params_unions`
+
+The following command optimizes the RF hyperparameters using [HyperOpt](https://github.com/hyperopt/hyperopt) with a pre-defined parameter grid.
+
+`python photoz.py --nodes 1 --survey unions --optimize True --algorithm RF --input example/params_unions`
+
+Both commands output files in the output/unions/[figures, files] directories. See **Usage** for more details.
+
+# Machine learning algorithms
 WIP
-## Machine learning
 
 ### Terminology
 -   **RF**: random forest.
@@ -50,11 +71,13 @@ WIP
 -   **GBR**: gradient boosting regression.
 -   **LASSO**: least absolute shrinkage and selection operator.
 - **ENET**: elastic net regularization.
--   **MLM**: machine-learning method, may refer to ANN,RF or any other machine learning algorithm.
+-   **MLM**: machine-learning method, may refer to ANN, RF or any other machine learning algorithm.
 -   **spec-z**: spectroscopic redshift (the  _true_  redshift or the  _target_  of the regression).
 -   **photo-z**: the derived redshift value from an MLM estimator.
 
 # Usage
+WIP
+
 ## Parameters
 ### Preprocessing
 Input parameters are found in `params.py`. The following parameters are required for preprocessing calculation:
@@ -66,7 +89,7 @@ Input parameters are found in `params.py`. The following parameters are required
  - `path_to_tile_run`: `(str)` path to the directory containing the *spectral_surveys* directories in which shapepipe was ran
  - `spectral_surveys`: `(list)` names of the spectral surveys (e.g. ['SDSS', 'eBOSS']). Must be ordered in the same way as  `spectral_names`. 
 
-> **Note 1**: when running the preprocessing function `python photoz.py --nodes NODENUM --make True --survey SURVNAME`, where NODEDUM is the number of cores and SURVNAME is the survey name (either 'unions' or 'ps3pi_cfis'), a .csv spectral_catalog with columns RA, DEC, Z_SPEC is created from the original fits file.
+> **Note 1**: when running the preprocessing function `python photoz.py --nodes NODENUM --make True --survey SURVNAME`, where NODEDUM is the core number and SURVNAME is the survey name (either 'unions' or 'ps3pi_cfis'), a .csv spectral_catalog with columns RA, DEC, Z_SPEC is created from the original fits file.
 > 
 > **Note 2**: please ensure that the paste_cat_runner was the last Shapepipe module to run. Otherwise, PhotoZ won't read the correct file.
 > 
@@ -78,17 +101,23 @@ Input parameters are found in `params.py`. The following parameters are required
  - `temp_path`: `(str)` path used to create temporary files (files are usually heavy).
  - `bands`: `(list)` name of the different bands in your catalog (e.g. ['R', 'U', 'I', 'Z'])
  - `max_evals`: `(optinal, int)` number of evaluations for hyper parameter optimisation using `HyperOpt`. Defaults to 200.
- - `path_to_csv`: `(str)` path to pandas DataFrame (use pd.to_csv(path_to_csv.csv, index=False) to create input catalog. Please give name the spectral redshift column "Z_SPEC" and put it at the end. See /catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv for an example.
+ - `path_to_csv`: `(str)` path to pandas DataFrame (use pd.to_csv(path_to_csv.csv, index=False) to create input catalog. Please name the spectral redshift column "Z_SPEC" and put it at the end. See /catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv for an example.
 
 >**Note**: If the input DataFrame in `path_to_csv` containes NaNs they will be treated accordingly by the *preprocess* function. Please refrain from setting negative values (e.g. -1, -10, -99, etc) or any other kind of value instead of NaNs. Otherwise, the *preprocess* function will ignore them and the code will perform poorly.
 
-## Quickstart
-### Preprocessing
+## Commands
 WIP
+
+### Preprocessing
 
 ### Machine learning
 
+## Output files
+WIP
 
+### Preprocessing
+
+### Machine learning
 
 
 ## Citation
