@@ -9,8 +9,7 @@ module () {
 }
 
 # Full path to environment
-export SPENV="$HOME/.conda/envs/shapepipe"
-export SPDIR="$HOME/shapepipe"
+export SPENV="$HOME/.conda/envs/photoz"
 
 # Load moudules and activate conda environment
 module load intelpython/3
