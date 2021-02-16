@@ -24,7 +24,7 @@ Clone or download the PhotoZ repository:
 
 `git clone https://github.com/xavierjimenezp/shapepipe_photoz/`
 
-If you use conda, create a new environment:
+Create a new conda environment:
 
 `conda env create -f environment_photoz.yml`
 
