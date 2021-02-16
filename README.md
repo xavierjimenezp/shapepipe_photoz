@@ -89,11 +89,11 @@ Input parameters are found in `params.py`. The following parameters are required
  - `bands`: `(list)` name of the different bands in your catalog (e.g. ['R', 'U', 'I', 'Z'])
  - `output_path`: `(str)` path to save ouput files into. Defaults to current directory.
  - `output_name`: `(str)` directory in which to save output files (files also contain ouput_name).
+ - `temp_path`: `(str)` path used to create temporary files (files are usually heavy).
  
 ### Preprocessing
 Input parameters are found in `params.py`. The following parameters are required for preprocessing calculation:
 
- - `temp_path`: `(str)` path used to create temporary files (files are usually heavy).
  - `spectral_path`: `(str)` path to the directory containing the spectral catalogs.
  - `spectral_names`: `(list)` list containing all spectral catalog file names. Catalogs must be .fits files. Catalog headers must contain: ra, dec, z. 
  - `path_to_tile_run`: `(str)` path to the directory containing the *spectral_surveys* directories in which shapepipe was ran
@@ -109,7 +109,7 @@ Input parameters are found in `params.py`. The following parameters are required
 Input parameters are found in `params.py`. The following parameters are required for photometric redshift calculation:
 
  - `max_evals`: `(optinal, int)` number of evaluations for hyper parameter optimisation using `HyperOpt`. Defaults to 200.
- - `path_to_csv`: `(str)` path to pandas DataFrame (use pd.to_csv(path_to_csv.csv, index=False) to create input catalog. Please name the spectral redshift column "Z_SPEC" and put it at the end. See /catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv for an example.
+ - `path_to_csv`: `(str)` path to pandas DataFrame (use pd.to_csv(path_to_csv, index=False) to create input catalog. Please name the spectral redshift column "Z_SPEC" and put it at the end. See /catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv for an example.
 
 >**Note**: If the input DataFrame in `path_to_csv` containes NaNs they will be treated accordingly by the *preprocess* function. Please refrain from setting negative values (e.g. -1, -10, -99, etc) or any other kind of value instead of NaNs. Otherwise, the *preprocess* function will ignore them and the code will perform poorly.
 
