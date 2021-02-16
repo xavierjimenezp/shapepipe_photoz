@@ -87,7 +87,7 @@ WIP
 Input parameters are found in `params.py`. The following parameters are required for any process.
 
  - `bands`: `(list)` name of the different bands in your catalog (e.g. ['R', 'U', 'I', 'Z'])
- - `output_path`: `(str)` path to save ouput files into. Defaults to current directory.
+ - `output_path`: `(optional, str)` path to save ouput files into. Defaults to current directory.
  - `output_name`: `(str)` directory in which to save output files (files also contain ouput_name).
  - `temp_path`: `(str)` path used to create temporary files (files are usually heavy).
  
@@ -98,6 +98,7 @@ Input parameters are found in `params.py`. The following parameters are required
  - `spectral_names`: `(list)` list containing all spectral catalog file names. Catalogs must be .fits files. Catalog headers must contain: ra, dec, z. 
  - `path_to_tile_run`: `(str)` path to the directory containing the *spectral_surveys* directories in which shapepipe was ran
  - `spectral_surveys`: `(list)` names of the spectral surveys (e.g. ['SDSS', 'eBOSS']). Must be ordered in the same way as  `spectral_names`. 
+ - `input_path`: `(optional, str or bool)` replaces the path created with path_to_tile_run and spectral_surveys (example only). Defaults to False.
 
 > **Note 1**: when running the preprocessing function `python photoz.py --make True --survey SURVNAME`, where SURVNAME is the survey name (either 'unions' or 'ps3pi_cfis'), a .csv spectral_catalog with columns RA, DEC, Z_SPEC is created from the original fits file.
 > 
@@ -117,23 +118,23 @@ Input parameters are found in `params.py`. The following parameters are required
 
 The `photoz.py` python file takes the following arguments. The function can be executed without arguments in which case the default parameters will be used:
 
- - `--nodes or -n`: `(int)` number of cores to be used. Defaults to 1.
+ - `--nodes or -n`: `(optinal, int)` number of cores to be used. Defaults to 1.
 > **Note**: only `--make` and `--learning` can use more than one core
- - `--survey or -s`: `(str)` survey name. Either 'unions', 'ps3pi_cfis' or other. If other,  preprocessing functions won't be available. Defaults to 'none'.
- - `--input or -i`: `(str)` input file name for parameters file. Defaults to params.
+ - `--survey or -s`: `(optinal, str)` survey name. Either 'unions', 'ps3pi_cfis' or other. If other,  preprocessing functions won't be available. Defaults to 'none'.
+ - `--input or -i`: `(optinal, str)` input file name for parameters file. Defaults to params.
 
 ### Preprocessing
 
-- `--clean or -c`: `(bool)` if True, will create temporary directories and remove all the files within. Will also create output directories. Defaults to False.
-- `--make or -m`: `(bool)` if True, will create individual .csv files for each tile within paste_cat_runner. Defaults to False.
-- `--join or -j`: `(bool)` if True, will merge the individual .csv files created by `--make`. Files will be saved in /output/SURVNAME/files/ where SURVNAME is either 'unions' or 'ps3pi_cfis'.
-- `--plot or -p`: `(bool)` if True, will generate plots in /output/SURVNAME/figures/ where SURVNAME is either 'unions' or 'ps3pi_cfis'.
+- `--clean or -c`: `(optinal, bool)` if True, will create temporary directories and remove all the files within. Will also create output directories. Defaults to False.
+- `--make or -m`: `(optinal, bool)` if True, will create individual .csv files for each tile within paste_cat_runner. Defaults to False.
+- `--join or -j`: `(optinal, bool)` if True, will merge the individual .csv files created by `--make`. Files will be saved in /output/SURVNAME/files/ where SURVNAME is either 'unions' or 'ps3pi_cfis'. Defaults to False.
+- `--plot or -p`: `(optinal, bool)` if True, will generate plots in /output/SURVNAME/figures/ where SURVNAME is either 'unions' or 'ps3pi_cfis'. Defaults to False.
 
 ### Machine learning
 
- - `--algorithm or -a`: `(str)` MLM algorithm (see **Terminology** for options). Use BEST if you want to try them all and output the best one. Defaults to SVR.
- - `--learning or -l`: `(bool)` if True, will compute **photo-z** using the MLM algorithm specified with `--algorithm`. Default hyperparameters will be used. Defaults to False.
- - `--optimize or -o`: `(bool)` if True, will use a predefined hyperparameter grid to optimize the MLM algorithm with HyperOpt. This functionality may be very time expensive. Recommended value for max_evals in params.py is 200. Defaults to False.
+ - `--algorithm or -a`: `(optinal, str)` MLM algorithm (see **Terminology** for options). Use BEST if you want to try them all and output the best one. Defaults to SVR.
+ - `--learning or -l`: `(optinal, bool)` if True, will compute **photo-z** using the MLM algorithm specified with `--algorithm`. Default hyperparameters will be used. Defaults to False.
+ - `--optimize or -o`: `(optinal, bool)` if True, will use a predefined hyperparameter grid to optimize the MLM algorithm with HyperOpt. This functionality may be very time expensive. Recommended value for max_evals in params.py is 200. Defaults to False.
 
 >**Note**: `--optimize` currently only supports RF, SVR and XGB (ANN is under development and the other MLM should be available soon)
 
