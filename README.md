@@ -116,7 +116,7 @@ The `photoz.py` python file takes the following arguments. The function can be e
  - `--nodes or -n`: `(int)` number of cores to be used. Defaults to 1.
 > **Note**: only `--make` and `--learning` can use more than one core
  - `--survey or -s`: `(str)` survey name. Either 'unions', 'ps3pi_cfis' or other. If other,  preprocessing functions won't be available. Defaults to 'none'.
- - `--input or -i`: `(str)` input file name for parameters file. Defaults to param.
+ - `--input or -i`: `(str)` input file name for parameters file. Defaults to params.
 
 ### Preprocessing
 
