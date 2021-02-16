@@ -135,6 +135,8 @@ The `photoz.py` python file takes the following arguments. The function can be e
  - `--learning or -l`: `(bool)` if True, will compute **photo-z** using the MLM algorithm specified with `--algorithm`. Default hyperparameters will be used. Defaults to False.
  - `--optimize or -o`: `(bool)` if True, will use a predefined hyperparameter grid to optimize the MLM algorithm with HyperOpt. This functionality may be very time expensive. Recommended value for max_evals in params.py is 200. Defaults to False.
 
+>**Note**: `--optimize` currently only supports RF, SVR and XGB (ANN is under development and the other MLM should be available soon)
+
 ## Output files
 WIP
 
