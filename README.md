@@ -17,7 +17,7 @@ Currently supports UNIONS and CFIS_PS3PI tiles.
 Photometric redshift functionalities are available for all catalogs. Please refer to section **Usage** for input files format.
 
 # Disclaimer
-PhotoZ is currentlty under developement and may contain bugs or instabilities. 
+PhotoZ is currentlty under early developement and may contain bugs or instabilities. 
 
 # Installation 
 Clone or download the PhotoZ repository:
@@ -38,20 +38,39 @@ Install the code:
 # Examples
 WIP
 # Algorithms
+WIP
+## Machine learning
+
+### Terminology
+-   **RF**: random forest.
+-   **ANN**: artificial neural network.
+- **XGB**: XGBoost.
+- **SVR**: support vector regression. 
+- **KRR**: kernel ridge regression
+-   **GBR**: gradient boosting regression.
+-   **LASSO**: least absolute shrinkage and selection operator.
+- **ENET**: elastic net regularization.
+-   **MLM**: machine-learning method, may refer to ANN,RF or any other machine learning algorithm.
+-   **spec-z**: spectroscopic redshift (the  _true_  redshift or the  _target_  of the regression).
+-   **photo-z**: the derived redshift value from an MLM estimator.
 
 # Usage
 ## Parameters
 ### Preprocessing
 Input parameters are found in `params.py`. The following parameters are required for preprocessing calculation:
 
- - `spectral_path`: `(str)` path to the directory containing the spectral catalogs. 
- - `spectral_names`: `(list)` list containing all spectral catalog file names. Catalogs should be fits files. Catalog header must contain: ra, dec, z. 
+ - `spectral_path`: `(str)` path to the directory containing the spectral catalogs.
+ - `spectral_names`: `(list)` list containing all spectral catalog file names. Catalogs must be .fits files. Catalog headers must contain: ra, dec, z. 
  - `temp_path`: `(str)` path used to create temporary files (files are usually heavy).
  - `bands`: `(list)` name of the different bands in your catalog (e.g. ['R', 'U', 'I', 'Z'])
- - `path_to_tile_run`: `(str)` [Description]
+ - `path_to_tile_run`: `(str)` path to the directory containing the *spectral_surveys* directories in which shapepipe was ran
  - `spectral_surveys`: `(list)` names of the spectral surveys (e.g. ['SDSS', 'eBOSS']). Must be ordered in the same way as  `spectral_names`. 
 
-> **Note**: When running the preprocessing function `python photoz.py --nodes NODENUM --make True --survey SURVNAME`, where NODEDUM is the number of cores and SURVNAME is the survey name (either 'unions' or 'ps3pi_cfis'), a .csv spectral_catalog with columns RA, DEC, Z_SPEC is created from the original fits file.
+> **Note 1**: when running the preprocessing function `python photoz.py --nodes NODENUM --make True --survey SURVNAME`, where NODEDUM is the number of cores and SURVNAME is the survey name (either 'unions' or 'ps3pi_cfis'), a .csv spectral_catalog with columns RA, DEC, Z_SPEC is created from the original fits file.
+> 
+> **Note 2**: please ensure that the paste_cat_runner was the last Shapepipe module to run. Otherwise, PhotoZ won't read the correct file.
+> 
+> **Note 3**: path to paste_cat_runner is defined as `path_to_tile_run/spectral_survey/output/` where spectral_survey is in spectral_surveys
 
 ### Machine learning algorithms
 Input parameters are found in `params.py`. The following parameters are required for photometric redshift calculation:
@@ -64,10 +83,10 @@ Input parameters are found in `params.py`. The following parameters are required
 >**Note**: If the input DataFrame in `path_to_csv` containes NaNs they will be treated accordingly by the *preprocess* function. Please refrain from setting negative values (e.g. -1, -10, -99, etc) or any other kind of value instead of NaNs. Otherwise, the *preprocess* function will ignore them and the code will perform poorly.
 
 ## Quickstart
-
+### Preprocessing
 WIP
 
-
+### Machine learning
 
 
 
