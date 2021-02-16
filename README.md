@@ -10,7 +10,7 @@
 |0.0.1|16/02/2021            |
 
 
-[Shapepipe](https://github.com/CosmoStat/shapepipe) extension to preprocess individual tile output catalogs and compute photometric redshifts with different methods.
+[Shapepipe](https://github.com/CosmoStat/shapepipe) extension to preprocess individual tile output catalogs and compute photometric redshifts with different machine learning methods.
 
 Currently supports UNIONS and CFIS_PS3PI tiles.
 
@@ -39,27 +39,27 @@ or
 Install the code:  
 `python setup.py --install`
 
-# Examples
-WIP
+# Quickstart
+WIP add a few cat-___.___.fits files for quick example
 ## Preprocessing
 
-`python photoz.py --nodes 1 --survey unions --clean True --input example/params_unions`
+`python photoz.py --nodes 1 --survey cfis_ps3pi --clean True --input example/params_cfis_ps3pi`
 
-`python photoz.py --nodes 1 --survey unions --make True --input example/params_unions`
+`python photoz.py --nodes 1 --survey cfis_ps3pi --make True --input example/params_cfis_ps3pi`
 
-`python photoz.py --nodes 1 --survey unions --join True --input example/params_unions`
+`python photoz.py --nodes 1 --survey cfis_ps3pi --join True --input example/params_cfis_ps3pi`
 
-`python photoz.py --nodes 1 --survey unions --plot True --input example/params_unions`
+`python photoz.py --nodes 1 --survey cfis_ps3pi --plot True --input example/params_cfis_ps3pi`
 
 ## Machine learning algorithms
 
-The following command runs the **random forest** (RF) algorithm with default hyperparameters through the catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv  catalog using the example/params_unions.py config file.
+The following command runs the **random forest** (RF) algorithm with default hyperparameters through the catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv  catalog using the example/params_cfis_ps3pi.py config file.
 
-`python photoz.py --nodes 1 --survey unions --learning True --algorithm RF --input example/params_unions`
+`python photoz.py --nodes 1 --survey cfis_ps3pi --learning True --algorithm RF --input example/params_cfis_ps3pi`
 
 The following command optimizes the RF hyperparameters using [HyperOpt](https://github.com/hyperopt/hyperopt) with a pre-defined parameter grid.
 
-`python photoz.py --nodes 1 --survey unions --optimize True --algorithm RF --input example/params_unions`
+`python photoz.py --nodes 1 --survey cfis_ps3pi --optimize True --algorithm RF --input example/params_cfis_ps3pi`
 
 Both commands output files in the output/unions/[figures, files] directories. See **Usage** for more details.
 
@@ -83,13 +83,19 @@ WIP
 WIP
 
 ## Parameters
+
+Input parameters are found in `params.py`. The following parameters are required for any process.
+
+ - `temp_path`: `(str)` path used to create temporary files (files are usually heavy).
+ - `bands`: `(list)` name of the different bands in your catalog (e.g. ['R', 'U', 'I', 'Z'])
+ - `output_path`: `(str)` path to save ouput files into. Defaults to current directory.
+ - `output_name`: `(str)` directory in which to save output files (files also contain ouput_name).
+ 
 ### Preprocessing
 Input parameters are found in `params.py`. The following parameters are required for preprocessing calculation:
 
  - `spectral_path`: `(str)` path to the directory containing the spectral catalogs.
  - `spectral_names`: `(list)` list containing all spectral catalog file names. Catalogs must be .fits files. Catalog headers must contain: ra, dec, z. 
- - `temp_path`: `(str)` path used to create temporary files (files are usually heavy).
- - `bands`: `(list)` name of the different bands in your catalog (e.g. ['R', 'U', 'I', 'Z'])
  - `path_to_tile_run`: `(str)` path to the directory containing the *spectral_surveys* directories in which shapepipe was ran
  - `spectral_surveys`: `(list)` names of the spectral surveys (e.g. ['SDSS', 'eBOSS']). Must be ordered in the same way as  `spectral_names`. 
 
@@ -102,8 +108,6 @@ Input parameters are found in `params.py`. The following parameters are required
 ### Machine learning algorithms
 Input parameters are found in `params.py`. The following parameters are required for photometric redshift calculation:
 
- - `temp_path`: `(str)` path used to create temporary files (files are usually heavy).
- - `bands`: `(list)` name of the different bands in your catalog (e.g. ['R', 'U', 'I', 'Z'])
  - `max_evals`: `(optinal, int)` number of evaluations for hyper parameter optimisation using `HyperOpt`. Defaults to 200.
  - `path_to_csv`: `(str)` path to pandas DataFrame (use pd.to_csv(path_to_csv.csv, index=False) to create input catalog. Please name the spectral redshift column "Z_SPEC" and put it at the end. See /catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv for an example.
 
