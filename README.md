@@ -86,7 +86,6 @@ WIP
 
 Input parameters are found in `params.py`. The following parameters are required for any process.
 
- - `temp_path`: `(str)` path used to create temporary files (files are usually heavy).
  - `bands`: `(list)` name of the different bands in your catalog (e.g. ['R', 'U', 'I', 'Z'])
  - `output_path`: `(str)` path to save ouput files into. Defaults to current directory.
  - `output_name`: `(str)` directory in which to save output files (files also contain ouput_name).
@@ -94,12 +93,13 @@ Input parameters are found in `params.py`. The following parameters are required
 ### Preprocessing
 Input parameters are found in `params.py`. The following parameters are required for preprocessing calculation:
 
+ - `temp_path`: `(str)` path used to create temporary files (files are usually heavy).
  - `spectral_path`: `(str)` path to the directory containing the spectral catalogs.
  - `spectral_names`: `(list)` list containing all spectral catalog file names. Catalogs must be .fits files. Catalog headers must contain: ra, dec, z. 
  - `path_to_tile_run`: `(str)` path to the directory containing the *spectral_surveys* directories in which shapepipe was ran
  - `spectral_surveys`: `(list)` names of the spectral surveys (e.g. ['SDSS', 'eBOSS']). Must be ordered in the same way as  `spectral_names`. 
 
-> **Note 1**: when running the preprocessing function `python photoz.py --nodes NODENUM --make True --survey SURVNAME`, where NODEDUM is the core number and SURVNAME is the survey name (either 'unions' or 'ps3pi_cfis'), a .csv spectral_catalog with columns RA, DEC, Z_SPEC is created from the original fits file.
+> **Note 1**: when running the preprocessing function `python photoz.py --make True --survey SURVNAME`, where SURVNAME is the survey name (either 'unions' or 'ps3pi_cfis'), a .csv spectral_catalog with columns RA, DEC, Z_SPEC is created from the original fits file.
 > 
 > **Note 2**: please ensure that the paste_cat_runner was the last Shapepipe module to run. Otherwise, PhotoZ won't read the correct file.
 > 
