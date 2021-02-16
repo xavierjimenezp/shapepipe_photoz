@@ -21,13 +21,17 @@ PhotoZ is currentlty under early developement and may contain bugs or instabilit
 
 # Installation 
 Clone or download the PhotoZ repository:
+
 `git clone https://github.com/xavierjimenezp/shapepipe_photoz/`
 
 If you use conda, create a new environment:
+
 `conda env create -f environment_photoz.yml`
+
 (Additional information relative to conda environments https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#)
 
 Activate the environment:
+
 `source activate photoz`
 or 
 `conda activate photoz`
