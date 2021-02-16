@@ -12,7 +12,7 @@
 
 [Shapepipe](https://github.com/CosmoStat/shapepipe) extension to preprocess individual tile output catalogs and compute photometric redshifts with different machine learning methods.
 
-Currently supports UNIONS and CFIS_PS3PI tiles.
+Currently supports UNIONS and CFIS_PS3pi tiles.
 
 Photometric redshift functionalities are available for all catalogs. Please refer to section **Usage** for input files format.
 
@@ -28,7 +28,7 @@ If you use conda, create a new environment:
 
 `conda env create -f environment_photoz.yml`
 
-(Additional information relative to conda environments https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#)
+(Additional information relative to conda environments: [click here](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#)) 
 
 Activate the environment:
 
