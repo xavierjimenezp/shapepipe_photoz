@@ -36,8 +36,7 @@ Activate the environment:
 or 
 `conda activate photoz`
 
-Install the code:  
-`python setup.py --install`
+Code is ready to run !
 
 # Quickstart
 WIP add a few cat-___.___.fits files for quick example
