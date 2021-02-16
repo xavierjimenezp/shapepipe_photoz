@@ -109,12 +109,27 @@ Input parameters are found in `params.py`. The following parameters are required
 
 >**Note**: If the input DataFrame in `path_to_csv` containes NaNs they will be treated accordingly by the *preprocess* function. Please refrain from setting negative values (e.g. -1, -10, -99, etc) or any other kind of value instead of NaNs. Otherwise, the *preprocess* function will ignore them and the code will perform poorly.
 
-## Commands
-WIP
+## Arguments
+
+The `photoz.py` python file takes the following arguments. The function can be executed without arguments in which case the default parameters will be used:
+
+ - `--nodes or -n`: `(int)` number of cores to be used. Defaults to 1.
+> **Note**: only `--make` and `--learning` can use more than one core
+ - `--survey or -s`: `(str)` survey name. Either 'unions', 'ps3pi_cfis' or other. If other,  preprocessing functions won't be available. Defaults to 'none'.
+ - `--input or -i`: `(str)` input file name for parameters file. Defaults to param.
 
 ### Preprocessing
 
+- `--clean or -c`: `(bool)` if True, will create temporary directories and remove all the files within. Will also create output directories. Defaults to False.
+- `--make or -m`: `(bool)` if True, will create individual .csv files for each tile within paste_cat_runner. Defaults to False.
+- `--join or -j`: `(bool)` if True, will merge the individual .csv files created by `--make`. Files will be saved in /output/SURVNAME/files/ where SURVNAME is either 'unions' or 'ps3pi_cfis'.
+- `--plot or -p`: `(bool)` if True, will generate plots in /output/SURVNAME/figures/ where SURVNAME is either 'unions' or 'ps3pi_cfis'.
+
 ### Machine learning
+
+ - `--algorithm or -a`: `(str)` MLM algorithm (see **Terminology** for options). Defaults to SVR.
+ - `--learning or -l`: `(bool)` if True, will compute **photo-z** using the MLM algorithm specified with `--algorithm`. Default hyperparameters will be used. Defaults to False.
+ - `--optimize or -o`: `(bool)` if True, will use a predefined hyperparameter grid to optimize the MLM algorithm with HyperOpt. This functionality may be very time expensive. Recommended value for max_evals in params.py is 200. Defaults to False.
 
 ## Output files
 WIP
