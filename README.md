@@ -1,3 +1,4 @@
+
 <image src="Cosmostat_logo.png" width="250" align="left"/>
 
 # ShapePipe PhotoZ 
@@ -63,7 +64,8 @@ The following command optimizes the RF hyperparameters using [HyperOpt](https://
 Both commands output files in the output/unions/[figures, files] directories. See **Usage** for more details.
 
 # Machine learning algorithms
-WIP
+
+PhotoZ combines state of the art machine learning algorithms and implements the most used Python libraries: `Scikit-Learn`, `TensorFlow`, `Keras`,`XGBoost`, `LightGBM`, `HyperOpt`, etc.
 
 ### Terminology
 -   **RF**: random forest.
@@ -79,7 +81,8 @@ WIP
 -   **photo-z**: the derived redshift value from an MLM estimator.
 
 # Usage
-WIP
+
+The following section presents the different parameters that need to be filled in `params.py` as well as the different arguments that can be used in order to preprocess ShapePipe's individual tile catalogs from module `paste_cat_runner` and run the machine learning algorithm on those catalogs.
 
 ## Parameters
 
@@ -118,7 +121,7 @@ Input parameters are found in `params.py`. The following parameters are required
 The `photoz.py` python file takes the following arguments. The function can be executed without arguments in which case the default parameters will be used:
 
  - `--nodes or -n`: `(optinal, int)` number of cores to be used. Defaults to 1.
-> **Note**: only `--make` and `--learning` can use more than one core
+> **Note**: only `--make`, `--learning` and `--optimize` can use more than one core.
  - `--survey or -s`: `(optinal, str)` survey name. Either 'unions', 'ps3pi_cfis' or other. If other,  preprocessing functions won't be available. Defaults to 'none'.
  - `--input or -i`: `(optinal, str)` input file name for parameters file. Defaults to params.
 
