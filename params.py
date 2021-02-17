@@ -26,10 +26,10 @@ temp_path = '/n17data/jimenez/temp/'
 # # # # # PREPROCESSING PARAMS # # # # #
 #------------------------------------------------------------------#
 
-spectral_path = path + 'catalogs/'
+spectral_path = '/home/jimenez/spectral_catalogs/'
 spectral_names = ['alldeep.egs.uniq.2012jun13']
-path_to_tile_run = False
-input_path = 'example/ps3pi_cfis/tiles/'
+path_to_tile_run = '/n17data/jimenez/shaperun/'
+input_path = False
 spectral_surveys = ['deep23']
 vignet = False
 

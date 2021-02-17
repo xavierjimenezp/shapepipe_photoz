@@ -23,7 +23,6 @@ import argparse
 
 import warnings
 warnings.filterwarnings('ignore')
-
 from functions import *
 
 #------------------------------------------------------------------#
@@ -38,8 +37,8 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--clean", required=False, type=bool, nargs="?", const=False)
     parser.add_argument("-m", "--make", required=False, type=bool, nargs="?", const=False)
     parser.add_argument("-j", "--join", required=False, type=bool, nargs="?", const=False)
-    parser.add_argument("-g", "--generate_plot", required=False, type=bool, nargs="?", const=False)
-    parser.add_argument("-p", "--preprocess", required=False, type=str, nargs="?", const='none')    
+    parser.add_argument("-g", "--generate_plots", required=False, type=bool, nargs="?", const=False)
+    parser.add_argument("-p", "--preprocess", required=False, type=str, nargs="?", const=None)    
     parser.add_argument("-l", "--learning", required=False, type=bool, nargs="?", const=False)
     parser.add_argument("-o", "--optimize", required=False, type=bool, nargs="?", const=False)
     parser.add_argument("-a", "--algorithm", required=False, type=str, nargs="?", const='SVR')
@@ -106,14 +105,15 @@ if __name__ == "__main__":
         #------------------------------------------------------------------#
 
         elif args.join == True:
+            vignet = params.vignet
             cat = MakeCatalogs(args.survey, bands, temp_path)
-            cat.merge_catalogs(output_name, vignet=True)
+            cat.merge_catalogs(output_name, vignet=vignet)
 
         #------------------------------------------------------------------#
         # # # # # SAVE FIGURES # # # # #
         #------------------------------------------------------------------#
 
-        elif args.plot == True:
+        elif args.generate_plots == True:
             spectral_names = params.spectral_names
             GenPlot = GeneratePlots(args.survey, bands, temp_path, csv_name=output_name, spectral_names=spectral_names)
             # GenPlot.plot_d2d()
@@ -138,13 +138,13 @@ if __name__ == "__main__":
             if path_to_csv == 'default':
                 if args.survey == 'ps3pi_cfis':
                     path_to_csv = output_path + output_name + '.csv'
-                    ML = LearningAlgorithms(args.survey, bands, path_to_csv, output_name)
+                    ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name)
                     df = ML.merge_cfis_r_cfht_u_medium_deep_i_g_z()
                     df = ML.preprocess(df, method = args.preprocess)
                     ML.plot_corrmat(df)
                 elif args.survey == 'unions':
                     path_to_csv = output_path + output_name + '.csv'
-                    ML = LearningAlgorithms(args.survey, bands, path_to_csv, output_name)
+                    ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name)
                     df = ML.dataframe()
                     df = ML.gal_g()
                     df = ML.preprocess(df, method = args.preprocess)
@@ -153,10 +153,12 @@ if __name__ == "__main__":
                     raise("--survey needs to be set to 'unions' or 'ps3pi_cfis', please specify the full path to your DataFrame")
 
             elif path_to_csv != 'default':
-                ML = LearningAlgorithms(args.survey, bands, path_to_csv, output_name)
+                ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name)
                 df = ML.dataframe()
+                print(args.preprocess)
                 df = ML.preprocess(df, method = args.preprocess)
                 ML.plot_corrmat(df)
+
 
          
             
@@ -168,7 +170,7 @@ if __name__ == "__main__":
             alg = algs[args.algorithm]
 
             def run(alg):
-                method = alg(args.survey, bands, output_name, dataframe=df)
+                method = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=False, validation_set=False)
                 method.plot(lim=1.8)
                 score = method.score(cv=4)
                 print("%s: "%args.algorithm + "Sigma: {:.3f} +- {:.4f}, outlier rate: {:.3f} +- {:.3f} % ".format(score[0], score[1], score[2]*100, score[3]*100))
@@ -192,7 +194,7 @@ if __name__ == "__main__":
 
             if args.algorithm == 'ANN':
 
-                # ML = LearningAlgorithms(args.survey, bands, path_to_csv, output_name, validation_set=True)
+                # ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name, validation_set=True)
                 # X_train, X_val, X_test, Y_train, Y_val, Y_test = ML.data()
                 # X_train, Y_train, X_val, Y_val = data()
 
@@ -206,17 +208,17 @@ if __name__ == "__main__":
                 # print("%s Opt : "%args.algorithm + "Sigma: {:.3f}, outlier rate: {:.3f} % ".format(sigma, eta*100))      
 
                 # ML.plot_zphot_zspec(Y_pred.flatten(), method='ANN_Opt', lim=1.8)
-                
-                ML = LearningAlgorithms(args.survey, bands, path_to_csv, output_name)
+
+                ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name)
                 df = ML.dataframe()
                 df = ML.preprocess(df, method = args.preprocess)
                 ML.plot_corrmat(df)
-                ModelOptimizer = alg(args.survey, bands, output_name, dataframe=df, validation_set=True)
+                ModelOptimizer = alg(args.survey, bands, output_name, dataframe=df, path_to_csv=False, validation_set=True)
                 _, sigma, eta = ModelOptimizer.best_params(max_evals=10)
                 print("%s Opt : "%args.algorithm + "Sigma: {:.3f}, outlier rate: {:.3f} % ".format(sigma, eta*100))      
 
             else:          
-                ML = LearningAlgorithms(args.survey, bands, path_to_csv, output_name)
+                ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name)
                 df = ML.dataframe()
                 df = ML.preprocess(df, method = args.preprocess)
                 ML.plot_corrmat(df)
@@ -272,7 +274,7 @@ if __name__ == "__main__":
             cat = MakeCatalogs(args.survey, bands, temp_path)
             cat.merge_catalogs(output_name, vignet=False)
 
-        elif args.plot == True:
+        elif args.generate_plots == True:
             GenPlot = GeneratePlots(args.survey, bands, temp_path, csv_name=output_name, spectral_names=spectral_names)
             # GenPlot.plot_d2d()
             GenPlot.plot_matched_r_i_i_z()

@@ -19,6 +19,7 @@ import pandas as pd
 import importlib
 import matplotlib.pyplot as plt
 import matplotlib.style as style
+from pandas.core.base import NoNewAttributesMixin
 import seaborn as sns
 # from sklearn import kernel_ridge
 # from sklearn.utils import validation
@@ -810,9 +811,9 @@ class LearningAlgorithms(object):
         self._path = os.getcwd() + '/'
         self.survey = survey
         self._bands = bands
-        if path_to_csv != False:
+        if type(path_to_csv) != bool:
             self.df = pd.read_csv(path_to_csv)
-        elif dataframe != False:
+        elif type(dataframe) != bool:
             self.df = dataframe
         else:
             raise('Error: neither path_to_csv nor dataframe where specified')
@@ -990,7 +991,7 @@ class LearningAlgorithms(object):
         
 
     def preprocess(self, df, method='drop'):
-        if method == 'none':
+        if method == None:
             return df
         else:
             df = df.replace([-1, -10, -99], np.nan)
@@ -1018,7 +1019,7 @@ class LearningAlgorithms(object):
                 for i in missing_data.index:
                     df[i] = df[i].fillna(method)
             else:
-                print("Error: method is not defined. Possible values include 'drop', 'mode', 'mean', 'median' or int/float")
+                print("Error: preprocess method is not defined. Possible values include 'drop', 'mode', 'mean', 'median' or int/float")
 
         missing_data = self.missing_data(df)
         if missing_data.empty == True:
