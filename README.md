@@ -143,9 +143,12 @@ The `photoz.py` python file takes the following arguments. The function can be e
     - mean, median: same as mode
    
  - `--learning or -l`: `(optinal, bool)` if True, will compute **photo-z** using the MLM algorithm specified with `--algorithm`. Default hyperparameters will be used. Defaults to False.
- - `--optimize or -o`: `(optinal, str)` either 'HyperOpt' or 'RandomSearch', will use a predefined hyperparameter grid to optimize the MLM algorithm. This functionality may be very time expensive. Recommended value for max_evals in params.py is 200. Defaults to None.
+ - `--optimize or -o`: `(optinal, str)` either 'HyperOpt', 'RandomSearch' or 'GridSearch'. Will use a predefined hyperparameter grid to optimize the MLM algorithm. For each method the grid is hard coded in Optimizer class and can be changed manually. This functionality may be very time expensive. Recommended value for max_evals in params.py is 200. Defaults to None.
 
->**Note**: `--optimize` currently only supports RF, SVR, KRR and XGB (ANN is under development and the other MLM should be available soon) with HyperOpt and RF with RandomSearch. RandomSearch implementation will soon be available for other MLM.
+>**Note**: `--optimize` currently only supports :
+> - HyperOpt: RF, SVR, KRR and XGB (ANN is under development and the other MLM should be available soon) 
+> - RandomSearch: RF (other MLM should be available soon). 
+> - GridSearch: RF (other MLM should be available soon).
 
 ## Output files
 WIP
