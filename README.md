@@ -67,6 +67,7 @@ PhotoZ combines state of the art machine learning algorithms and implements the 
 -   **RF**: random forest.
 -   **ANN**: artificial neural network.
 - **XGB**: XGBoost.
+- **LGB**: LightGBM
 - **SVR**: support vector regression. 
 - **KRR**: kernel ridge regression
 -   **GBR**: gradient boosting regression.
