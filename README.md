@@ -36,8 +36,12 @@ or
 Code is ready to run !
 
 # Quickstart
-WIP add a few cat-___.___.fits files for quick example
+
+Tutorial to run a simple example.
+
 ## Preprocessing
+
+The following commands take a ShapePipe output tile catalog in example/ps3pi_cfis/tile/ and preprocess it into a .csv catalog. Redshift distribution plots are also generated and can be found in output/ps3pi_cfis/figures/.
 
 `python photoz.py --survey ps3pi_cfis --clean True --input params_ps3pi_cfis`
 
