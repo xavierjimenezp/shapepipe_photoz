@@ -134,16 +134,16 @@ if __name__ == "__main__":
             GenFiles.make_directories(output=True)
 
             path_to_csv = params.path_to_csv
-
+            
             if path_to_csv == 'default':
                 if args.survey == 'ps3pi_cfis':
-                    path_to_csv = output_path + output_name + '.csv'
+                    path_to_csv = output_path + 'output/' + args.survey + '/files/' + output_name + '.csv'
                     ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name)
                     df = ML.merge_cfis_r_cfht_u_medium_deep_i_g_z()
                     df = ML.preprocess(df, method = args.preprocess)
                     ML.plot_corrmat(df)
                 elif args.survey == 'unions':
-                    path_to_csv = output_path + output_name + '.csv'
+                    path_to_csv = output_path + 'output/' + args.survey + '/files/' + output_name + '.csv'
                     ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name)
                     df = ML.dataframe()
                     df = ML.gal_g()
@@ -155,7 +155,6 @@ if __name__ == "__main__":
             elif path_to_csv != 'default':
                 ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name)
                 df = ML.dataframe()
-                print(args.preprocess)
                 df = ML.preprocess(df, method = args.preprocess)
                 ML.plot_corrmat(df)
 

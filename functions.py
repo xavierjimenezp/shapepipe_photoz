@@ -208,7 +208,7 @@ class GeneratePlots(object):
         self.csv_name = csv_name
         self.output_name = output_name
         self.spectral_names = spectral_names
-        self.output_path = self._path + 'output/' + self.survey + '/figures'
+        self.output_path = self._path + 'output/' + self.survey + '/figures/'
 
         self.df_matched = pd.read_csv(self._path + 'output/' + self.survey + '/files/' + self.csv_name + '.csv')
         self.df_unmatched = pd.read_csv(self._path + 'output/' + self.survey + '/files/' + self.csv_name + '_unmatched'+'.csv')
@@ -848,6 +848,7 @@ class LearningAlgorithms(object):
     def dataframe(self):
         return self.df
 
+
     def merge_cfis_r_cfht_u_medium_deep_i_g_z(self):
 
         CFHT = pd.read_csv(self._path+'catalogs/CFHTLens_2021-01-25T12_32_19.tsv', delimiter='\t')
@@ -890,15 +891,18 @@ class LearningAlgorithms(object):
         #########################################################################
 
         deep_2_3 = pd.DataFrame(data={'RA': RA, 'DEC': DEC, 'Z_SPEC': Z_SPEC})
-        mediumdeep = pd.read_csv(path+'cat_psmd_deep23.rsv', delimiter=',')
+        mediumdeep = pd.read_csv(self._path+'catalogs/cat_psmd_deep23.rsv', delimiter=',')
+
+        mediumdeep = mediumdeep[['ra', 'dec', 'i_stk_aper', 'z_stk_aper', 'g_stk_aper', 'g_stk_aper_err', 'i_stk_aper_err', 'z_stk_aper_err']].copy()
 
         for band in ['g', 'i', 'z']:
-            for s in ['stk', 'wrp']:
-                for a in ['aper', 'kron']:
+            for s in ['stk']:
+                for a in ['aper']:
                     mediumdeep.query("%s_%s_%s_err < 0.5"%(band,s,a), inplace=True)
 
         ID = np.arange(0, len(mediumdeep))
-        mediumdeep.drop(columns=['ID', 'g_flags', 'i_flags', 'r_flags','z_flags'], inplace=True)
+        # mediumdeep.drop(columns=['ID', 'g_flags', 'i_flags', 'r_flags','z_flags'], inplace=True)
+        mediumdeep.drop(columns=['g_stk_aper_err', 'i_stk_aper_err', 'z_stk_aper_err'], inplace=True)
         mediumdeep.insert(loc=0, value=ID, column='ID')
 
         scatalog_sub = SkyCoord(ra=deep_2_3['RA'].values, dec=deep_2_3['DEC'].values, unit='deg')
@@ -917,22 +921,23 @@ class LearningAlgorithms(object):
         df.query("ismatched == True", inplace=True)
         df.drop(columns=['ismatched', 'ID'], inplace=True)
 
-        ID = np.arange(0, len(df))
-        df.insert(loc=0, value=ID, column='ID')
+        # ID = np.arange(0, len(df))
+        # df.insert(loc=0, value=ID, column='ID')
 
         #########################################################################
 
-        CFHT_copy = CFHT_matched.copy()
-        CFHT_copy.drop(columns=['Z_SPEC'], inplace=True)
-
+        CFHT_copy = CFHT_matched[['ID', 'DEC', 'RA', 'MAG_u', 'MAGERR_u']].copy()
         CFHT_copy.query("MAGERR_u < 0.5", inplace=True)
+        CFHT_copy.drop(columns=['MAGERR_u'], inplace=True)
+
+        
 
 
-        df.drop(columns=['ID'], inplace=True)
+        # df.drop(columns=['ID'], inplace=True)
 
         scatalog_sub = SkyCoord(ra=df['RA'].values, dec=df['DEC'].values, unit='deg')
         pcatalog_sub = SkyCoord(ra=CFHT_copy['RA'].values, dec=CFHT_copy['DEC'].values, unit='deg')
-        idx, d2d, d3d = match_coordinates_sky(scatalog_sub, pcatalog_sub, nthneighbor=1)
+        idx, d2d, _ = match_coordinates_sky(scatalog_sub, pcatalog_sub, nthneighbor=1)
 
         tol = 0.3*u.arcsecond #threshold to consider whether or not two galaxies are the same
         ismatched = d2d < tol
@@ -946,18 +951,18 @@ class LearningAlgorithms(object):
         df_medium.query("ismatched == True", inplace=True)
         df_medium.drop(columns=['ismatched', 'ID'], inplace=True)
 
-        ID = np.arange(0, len(df_medium))
-        df_medium.insert(loc=0, value=ID, column='ID')
+        # ID = np.arange(0, len(df_medium))
+        # df_medium.insert(loc=0, value=ID, column='ID')
 
         #########################################################################
 
-        CFIS_R = pd.read_csv(self._path + 'output/' + self.survey + '/files/' + output_name + '.csv')
+        CFIS_R = pd.read_csv(self._path + 'output/' + self.survey + '/files/' + self.output_name + '.csv')
         CFIS_R = CFIS_R[['MAG_AUTO_R', 'RA', 'DEC', 'FWHM', 'ELONGATION', 'gal_g1', 'gal_g2', 'gal_gini', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_resolution', 'psf_sigma']].copy()
         CFIS_R = self.gal_g(CFIS_R) #create gal_g = |gal_g1 + gal_g2| and drop gal_g1, gal_g2
         ID = np.arange(0, len(CFIS_R))
         CFIS_R.insert(loc=0, value=ID, column='ID')
 
-        df_medium.drop(columns=['ID'], inplace=True)
+        # df_medium.drop(columns=['ID'], inplace=True)
 
         scatalog_sub = SkyCoord(ra=df_medium['RA'].values, dec=df_medium['DEC'].values, unit='deg')
         pcatalog_sub = SkyCoord(ra=CFIS_R['RA'].values, dec=CFIS_R['DEC'].values, unit='deg')
@@ -975,10 +980,11 @@ class LearningAlgorithms(object):
         df_medium_r.query("ismatched == True", inplace=True)
         df_medium_r.drop(columns=['ismatched', 'ID'], inplace=True)
 
-        ID = np.arange(0, len(df_medium_r))
-        df_medium_r.insert(loc=0, value=ID, column='ID')
-
-        df_medium_r.to_csv(self.output_path + 'MediumDeep_IZG_CFHT_U_CFIS_R_matched_catalog.csv', index=False)
+        # ID = np.arange(0, len(df_medium_r))
+        # df_medium_r.insert(loc=0, value=ID, column='ID')
+        
+        df_medium_r = df_medium_r[['MAG_AUTO_R', 'MAG_u', 'i_stk_aper', 'z_stk_aper', 'g_stk_aper', 'FWHM', 'ELONGATION', 'gal_g', 'gal_gini', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_resolution', 'psf_sigma', 'Z_SPEC']].copy()
+        df_medium_r.to_csv(self.output_path  + 'files/' + 'MediumDeep_IZG_CFHT_U_CFIS_R_matched_catalog.csv', index=False)
 
         return df_medium_r
 
@@ -1023,7 +1029,7 @@ class LearningAlgorithms(object):
 
         missing_data = self.missing_data(df)
         if missing_data.empty == True:
-            df.to_csv(self.output_path + self.output_name + '_preprocessed.csv')
+            df.to_csv(self.output_path + 'files/' + self.output_name + '_preprocessed.csv')
             return df
         else:
             print('Error: Dataframe contains NaNs, preprocess function could not handle them.')
