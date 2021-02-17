@@ -45,7 +45,7 @@ WIP add a few cat-___.___.fits files for quick example
 
 `python photoz.py --survey ps3pi_cfis --join True --input params_ps3pi_cfis`
 
-`python photoz.py --survey ps3pi_cfis --plot True --input params_ps3pi_cfis`
+`python photoz.py --survey ps3pi_cfis --generate_plots True --input params_ps3pi_cfis`
 
 ## Machine learning algorithms
 
@@ -127,11 +127,12 @@ The `photoz.py` python file takes the following arguments. The function can be e
 - `--clean or -c`: `(optinal, bool)` if True, will create temporary directories and remove all the files within. Will also create output directories. Defaults to False.
 - `--make or -m`: `(optinal, bool)` if True, will create individual .csv files for each tile within paste_cat_runner. Defaults to False.
 - `--join or -j`: `(optinal, bool)` if True, will merge the individual .csv files created by `--make`. Files will be saved in /output/SURVNAME/files/ where SURVNAME is either 'unions' or 'ps3pi_cfis'. Defaults to False.
-- `--plot or -p`: `(optinal, bool)` if True, will generate plots in /output/SURVNAME/figures/ where SURVNAME is either 'unions' or 'ps3pi_cfis'. Defaults to False.
+- `--generate_plots or -g`: `(optinal, bool)` if True, will generate plots in /output/SURVNAME/figures/ where SURVNAME is either 'unions' or 'ps3pi_cfis'. Defaults to False.
 
 ### Machine learning
 
  - `--algorithm or -a`: `(optinal, str)` MLM algorithm (see **Terminology** for options). Use BEST if you want to try them all and output the best one. Defaults to SVR.
+ - `--preprocess or -p`: `(optional, str)`: [Description]
  - `--learning or -l`: `(optinal, bool)` if True, will compute **photo-z** using the MLM algorithm specified with `--algorithm`. Default hyperparameters will be used. Defaults to False.
  - `--optimize or -o`: `(optinal, bool)` if True, will use a predefined hyperparameter grid to optimize the MLM algorithm with HyperOpt. This functionality may be very time expensive. Recommended value for max_evals in params.py is 200. Defaults to False.
 
