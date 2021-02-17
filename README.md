@@ -39,23 +39,23 @@ Code is ready to run !
 WIP add a few cat-___.___.fits files for quick example
 ## Preprocessing
 
-`python photoz.py --nodes 1 --survey ps3pi_cfis --clean True --input example/params_ps3pi_cfis`
+`python photoz.py --survey ps3pi_cfis --clean True --input params_ps3pi_cfis`
 
-`python photoz.py --nodes 1 --survey ps3pi_cfis --make True --input example/params_ps3pi_cfis`
+`python photoz.py --survey ps3pi_cfis --make True --input params_ps3pi_cfis`
 
-`python photoz.py --nodes 1 --survey ps3pi_cfis --join True --input example/params_ps3pi_cfis`
+`python photoz.py --survey ps3pi_cfis --join True --input params_ps3pi_cfis`
 
-`python photoz.py --nodes 1 --survey ps3pi_cfis --plot True --input example/params_ps3pi_cfis`
+`python photoz.py --survey ps3pi_cfis --plot True --input params_ps3pi_cfis`
 
 ## Machine learning algorithms
 
 The following command runs the **random forest** (RF) algorithm with default hyperparameters through the catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv  catalog using the example/params_ps3pi_cfis.py config file.
 
-`python photoz.py --nodes 1 --survey ps3pi_cfis --learning True --algorithm RF --input example/params_ps3pi_cfis`
+`python photoz.py --survey ps3pi_cfis --learning True --algorithm RF --input params_ps3pi_cfis`
 
 The following command optimizes the RF hyperparameters using [HyperOpt](https://github.com/hyperopt/hyperopt) with a pre-defined parameter grid.
 
-`python photoz.py --nodes 1 --survey ps3pi_cfis --optimize True --algorithm RF --input example/params_ps3pi_cfis`
+`python photoz.py --survey ps3pi_cfis --optimize True --algorithm RF --input params_ps3pi_cfis`
 
 Both commands output files in the output/unions/[figures, files] directories. See **Usage** for more details.
 
