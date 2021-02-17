@@ -4,7 +4,7 @@
 
 |Version         |Date                          |
 |----------------|-------------------------------|
-|0.0.1|16/02/2021            |
+|alpha|17/02/2021            |
 
 
 [ShapePipe](https://github.com/CosmoStat/shapepipe) extension to preprocess individual tile output catalogs and compute photometric redshifts with different machine learning methods.
