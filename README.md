@@ -97,6 +97,7 @@ Input parameters are found in `params.py`. The following parameters are required
  - `path_to_tile_run`: `(str)` path to the directory containing the *spectral_surveys* directories in which shapepipe was ran
  - `spectral_surveys`: `(list)` names of the spectral surveys (e.g. ['SDSS', 'eBOSS']). Must be ordered in the same way as  `spectral_names`. 
  - `input_path`: `(optional, str or bool)` replaces the path created with path_to_tile_run and spectral_surveys (example only). Defaults to False.
+ - `vignet`: `(bool)` if True, PhotoZ will output a 4d npy tensor containing all the matched object images in all bands.
 
 > **Note 1**: when running the preprocessing function `python photoz.py --make True --survey SURVNAME`, where SURVNAME is the survey name (either 'unions' or 'ps3pi_cfis'), a .csv spectral_catalog with columns RA, DEC, Z_SPEC is created from the original fits file.
 > 
