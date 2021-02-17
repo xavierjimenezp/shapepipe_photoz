@@ -132,7 +132,11 @@ The `photoz.py` python file takes the following arguments. The function can be e
 ### Machine learning
 
  - `--algorithm or -a`: `(optinal, str)` MLM algorithm (see **Terminology** for options). Use BEST if you want to try them all and output the best one. Defaults to SVR.
- - `--preprocess or -p`: `(optional, str)`: [Description]
+ - `--preprocess or -p`: `(optional, str, int or float)`: method to handle missing values. Columns with>15% missing values will be droped. If type(method)=str, methods include: 'drop', 'mode', 'mean', 'median'. if type(method)=int or float, missing values will be replaced by the selected value. Defaults to None.
+    - drop: rows with missing values are droped
+    - mode: missing values are replaced with column mode
+    - mean, median: same as mode
+   
  - `--learning or -l`: `(optinal, bool)` if True, will compute **photo-z** using the MLM algorithm specified with `--algorithm`. Default hyperparameters will be used. Defaults to False.
  - `--optimize or -o`: `(optinal, bool)` if True, will use a predefined hyperparameter grid to optimize the MLM algorithm with HyperOpt. This functionality may be very time expensive. Recommended value for max_evals in params.py is 200. Defaults to False.
 
