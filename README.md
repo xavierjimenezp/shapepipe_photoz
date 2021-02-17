@@ -1,6 +1,3 @@
-
-<image src="Cosmostat_logo.png" width="250" align="left"/>
-
 # ShapePipe PhotoZ 
  [![python37](https://camo.githubusercontent.com/e770ba34ca059770c9cf01c46dd567c3e0574e99d8afaf8e6179e55f432129c7/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f707974686f6e2d332e372d79656c6c6f772e737667)](https://www.python.org/)
 
