@@ -43,7 +43,7 @@ import tensorflow.keras as tfk
 # from sklearn.preprocessing import LabelEncoder
 # from sklearn.preprocessing import OneHotEncoder
 # from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler
+
 
 # from scipy.stats import norm
 # from scipy import stats
@@ -62,6 +62,10 @@ from hyperopt.pyll.base import scope
 from hyperas import optim
 from hyperas.distributions import choice, uniform
 
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import make_scorer
 from sklearn.linear_model import ElasticNet, Lasso,  BayesianRidge, LassoLarsIC
 from sklearn.ensemble import RandomForestRegressor,  GradientBoostingRegressor
 from sklearn.kernel_ridge import KernelRidge
@@ -665,6 +669,8 @@ class MakeCatalogs(object):
         dfbands_unmatched.to_csv(self.temp_path + self.survey + '/unmatched/'+'%s'%file_name[:-5]+'_'+spectral_name+'.csv', index=False)
 
         df_Z.to_csv(self.temp_path + self.survey + '/redshift/'+'%s'%file_name[:-5]+'_'+spectral_name+'.csv', index=False)
+
+        dfbands_matched.query("Z_SPEC > 0", inplace=True)
 
         # df_d2d.to_csv(self.temp_path + self.survey + '/d2d/'+'%s'%file_name[:-5]+'_'+spectral_name+'.csv', index=False)
 
@@ -1480,7 +1486,7 @@ class ArtificialNeuralNetwork(LearningAlgorithms):
 
         ann = self.ann()
         
-        ann.fit(X_train, self.y_train, batch_size = 32, epochs = 100)
+        ann.fit(X_train, self.y_train, batch_size = 32, epochs = 100, verbose=0)
         y_pred = ann.predict(X_test)
 
         y_test = self.y_test
@@ -1714,13 +1720,96 @@ class RandomForestOptimizer(Optimizer):
         best['criterion'] = criterion[best['criterion']]
         return best
 
-    def best_params(self, max_evals=200):
+    def grid_search(self):
+
+        score = make_scorer(self.sigma_eta_score, greater_is_better=False)
+        
+        # Number of trees in random forest
+        n_estimators = [int(x) for x in np.linspace(start = 10, stop = 500, num = 4)]
+        # Number of features to consider at every split
+        max_features = ['auto', 'sqrt']
+        # Maximum number of levels in tree
+        max_depth = [int(x) for x in np.linspace(5, 20, num = 4)]
+        max_depth.append(None)
+        # Minimum number of samples required to split a node
+        min_samples_split = [2, 5, 10]
+        # Minimum number of samples required at each leaf node
+        min_samples_leaf = [1, 2, 4]
+        # Method of selecting samples for training each tree
+        bootstrap = [True, False]
+        # Create the random grid
+        grid = {'n_estimators': n_estimators,
+                    'max_features': max_features,
+                    'max_depth': max_depth,
+                    'min_samples_split': min_samples_split,
+                    'min_samples_leaf': min_samples_leaf,
+                    'bootstrap': bootstrap}
+
+        # Use the random grid to search for best hyperparameters
+        # First create the base model to tune
+        rf = RandomForestRegressor()
+        # Random search of parameters, using 3 fold cross validation, 
+        # search across 100 different combinations, and use all available cores
+        rf_grid = GridSearchCV(estimator = rf, param_grid = grid, scoring=score, cv = 3, verbose=2, n_jobs = -1)
+        # Fit the random search model
+        rf_grid.fit(self.X_train, self.y_train)
+
+        best = rf_grid.best_params_
+
+        return best
+
+
+    def random_search(self, max_evals):
+
+        score = make_scorer(self.sigma_eta_score, greater_is_better=False)
+        
+        # Number of trees in random forest
+        n_estimators = [int(x) for x in np.linspace(start = 10, stop = 500, num = 10)]
+        # Number of features to consider at every split
+        max_features = ['auto', 'sqrt']
+        # Maximum number of levels in tree
+        max_depth = [int(x) for x in np.linspace(5, 20, num = 10)]
+        max_depth.append(None)
+        # Minimum number of samples required to split a node
+        min_samples_split = [2, 5, 10]
+        # Minimum number of samples required at each leaf node
+        min_samples_leaf = [1, 2, 4]
+        # Method of selecting samples for training each tree
+        bootstrap = [True, False]
+        # Create the random grid
+        random_grid = {'n_estimators': n_estimators,
+                    'max_features': max_features,
+                    'max_depth': max_depth,
+                    'min_samples_split': min_samples_split,
+                    'min_samples_leaf': min_samples_leaf,
+                    'bootstrap': bootstrap}
+
+        # Use the random grid to search for best hyperparameters
+        # First create the base model to tune
+        rf = RandomForestRegressor()
+        # Random search of parameters, using 3 fold cross validation, 
+        # search across 100 different combinations, and use all available cores
+        rf_random = RandomizedSearchCV(estimator = rf, param_distributions = random_grid, scoring=score, n_iter = max_evals, cv = 3, verbose=2, random_state=0, n_jobs = -1)
+        # Fit the random search model
+        rf_random.fit(self.X_train, self.y_train)
+
+        best = rf_random.best_params_
+
+        return best
+
+
+    def best_params(self, max_evals=200, method='HyperOpt'):
         trial = Trials()
-        best = self.optimize(trial, max_evals)
+        if method == 'HyperOpt':
+            best = self.optimize(trial, max_evals)
+        elif method == 'RandomSearch':
+            best = self.random_search(max_evals)
+        elif method == 'GridSearch':
+            best = self.grid_search()
         _, y_pred, y_test = LearningAlgorithms.model(self, regressor=RandomForestRegressor(**best), scaler=True)
         eta, sigma = LearningAlgorithms.sigma_eta(self, y_test, y_pred)
 
-        LearningAlgorithms.plot_zphot_zspec(self, y_pred.flatten(), self.method, lim=1.8)
+        LearningAlgorithms.plot_zphot_zspec(self, y_pred.flatten(), self.method+'_'+method, lim=1.8)
 
         return y_pred, eta, sigma
 

@@ -40,9 +40,9 @@ if __name__ == "__main__":
     parser.add_argument("-g", "--generate_plots", required=False, type=bool, nargs="?", const=False)
     parser.add_argument("-p", "--preprocess", required=False, type=str, nargs="?", const=None)    
     parser.add_argument("-l", "--learning", required=False, type=bool, nargs="?", const=False)
-    parser.add_argument("-o", "--optimize", required=False, type=bool, nargs="?", const=False)
+    parser.add_argument("-o", "--optimize", required=False, type=str, nargs="?", const='HyperOpt')
     parser.add_argument("-a", "--algorithm", required=False, type=str, nargs="?", const='SVR')
-    parser.add_argument("-i", "--input", required=False, type=str, nargs="?", const='params')
+    parser.add_argument("-i", "--input", required=True, type=str, nargs="?", const='params')
 
     args = parser.parse_args()
 
@@ -150,7 +150,7 @@ if __name__ == "__main__":
                     df = ML.preprocess(df, method = args.preprocess)
                     ML.plot_corrmat(df)
                 else:
-                    raise("--survey needs to be set to 'unions' or 'ps3pi_cfis', please specify the full path to your DataFrame")
+                    raise TypeError("--survey needs to be set to 'unions' or 'ps3pi_cfis', please specify the full path to your DataFrame")
 
             elif path_to_csv != 'default':
                 ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name)
@@ -158,29 +158,46 @@ if __name__ == "__main__":
                 df = ML.preprocess(df, method = args.preprocess)
                 ML.plot_corrmat(df)
 
-
-         
-            
-
-
             algs = {'RF': RandomForest, 'ANN': ArtificialNeuralNetwork, 'LASSO': LassoRegression, 'ENET': ElasticNetRegression,
                         'XGB':XGBoost, 'KRR':KernelRidgeRegression, 'SVR': SupportVectorRegression, 'LGB': LightGBM, 'GBR': GradientBoostingRegression}
-
-            alg = algs[args.algorithm]
-
-            def run(alg):
+         
+            if args.algorithm == 'BEST':
+                best_score = 1
+                best_alg = 'none'
+                for alg_name in algs:
+                    alg = algs[alg_name]
+                    method = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=False, validation_set=False)
+                    score = method.score(cv=4)
+                    print("%s: "%alg_name + "Sigma: {:.3f} +- {:.4f}, outlier rate: {:.3f} +- {:.3f} % ".format(score[0], score[1], score[2]*100, score[3]*100))
+                    if score[0]+score[2] < best_score:
+                        best_score = score[0]+score[2]
+                        best_alg = alg_name
+                alg = algs[best_alg]
                 method = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=False, validation_set=False)
                 method.plot(lim=1.8)
-                score = method.score(cv=4)
-                print("%s: "%args.algorithm + "Sigma: {:.3f} +- {:.4f}, outlier rate: {:.3f} +- {:.3f} % ".format(score[0], score[1], score[2]*100, score[3]*100))
+                print("[%s] "%args.algorithm + "%s: "%best_alg + "Sigma: {:.3f} +- {:.4f}, outlier rate: {:.3f} +- {:.3f} % ".format(score[0], score[1], score[2]*100, score[3]*100))
 
-            run(alg)
+
+            else:
+            
+                try:
+                    alg = algs[args.algorithm]
+                except:
+                    raise TypeError('MLM is not defined')
+
+                def run(alg):
+                    method = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=False, validation_set=False)
+                    method.plot(lim=1.8)
+                    score = method.score(cv=4)
+                    print("%s: "%args.algorithm + "Sigma: {:.3f} +- {:.4f}, outlier rate: {:.3f} +- {:.3f} % ".format(score[0], score[1], score[2]*100, score[3]*100))
+
+                run(alg)
 
         #------------------------------------------------------------------#
         # # # # # OPTIMIZE LEARNING ALGORITHMS # # # # #
         #------------------------------------------------------------------#
 
-        elif args.optimize == True:
+        elif args.optimize == 'HyperOpt' or args.optimize == 'RandomSearch' or args.optimize == 'GridSearch':
 
             path_to_csv = params.path_to_csv
             max_evals = params.max_evals
@@ -212,7 +229,7 @@ if __name__ == "__main__":
                 df = ML.dataframe()
                 df = ML.preprocess(df, method = args.preprocess)
                 ML.plot_corrmat(df)
-                ModelOptimizer = alg(args.survey, bands, output_name, dataframe=df, path_to_csv=False, validation_set=True)
+                ModelOptimizer = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=False, validation_set=False)
                 _, sigma, eta = ModelOptimizer.best_params(max_evals=10)
                 print("%s Opt : "%args.algorithm + "Sigma: {:.3f}, outlier rate: {:.3f} % ".format(sigma, eta*100))      
 
@@ -221,9 +238,9 @@ if __name__ == "__main__":
                 df = ML.dataframe()
                 df = ML.preprocess(df, method = args.preprocess)
                 ML.plot_corrmat(df)
-                ModelOptimizer = alg(args.survey, bands, output_name, dataframe=df, validation_set=False)
-                _, sigma, eta = ModelOptimizer.best_params(max_evals=max_evals)
-                print("%s Opt : "%args.algorithm + "Sigma: {:.3f}, outlier rate: {:.3f} % ".format(sigma, eta*100))
+                ModelOptimizer = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=False, validation_set=False)
+                _, sigma, eta = ModelOptimizer.best_params(max_evals=max_evals, method=args.optimize)
+                print("%s %s : "%(args.algorithm, args.optimize) + "Sigma: {:.3f}, outlier rate: {:.3f} % ".format(sigma, eta*100))
         
             
 #------------------------------------------------------------------#
