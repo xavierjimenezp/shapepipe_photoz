@@ -30,7 +30,7 @@ spectral_path = '/home/jimenez/spectral_catalogs/'
 spectral_names = ['alldeep.egs.uniq.2012jun13']
 path_to_tile_run = '/n17data/jimenez/shaperun/'
 input_path = False
-spectral_surveys = ['deep23']
+spectral_surveys = ['unmatched_deep23']
 vignet = False
 
 #------------------------------------------------------------------#
@@ -38,7 +38,8 @@ vignet = False
 #------------------------------------------------------------------#
 
 max_evals = 200
-path_to_csv = path + 'catalogs/' + 'MediumDeep_CFHT_CFIS_R_matched_catalog_2' + '.csv'
+path_to_csv = 'default'
+#path_to_csv = path + 'catalogs/' + 'MediumDeep_CFHT_CFIS_R_matched_catalog_2' + '.csv'
 
 
 
