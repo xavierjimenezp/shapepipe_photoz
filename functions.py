@@ -7,6 +7,7 @@ Created on Thu Nov 12 10:02:58 2020
 @author: Xavier Jimenez
 """
 
+
 #------------------------------------------------------------------#
 # # # # # Imports # # # # #
 #------------------------------------------------------------------#
@@ -602,7 +603,7 @@ class MakeCatalogs(object):
             ## merge
             df_mag = pd.merge(df_mag, df_to_cut, indicator=True, on='ID', how='outer').query('_merge=="both"').drop('_merge', axis=1)
 
-            MORPHO_NAMES = ['id', 'gal_g1', 'gal_g1_err', 'gal_g2', 'gal_g2_err', 'gal_gini', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_resolution', 'psf_sigma']
+            MORPHO_NAMES = ['id', 'gal_mag', 'gal_mag_err', 'gal_flux', 'gal_flux_err', 'gal_g1', 'gal_g1_err', 'gal_g2', 'gal_g2_err', 'gal_gini', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_resolution', 'psf_sigma']
             morpho_par = [HDU_tile['R_PSF'].data[param].tolist() for param in MORPHO_NAMES]
             df_morph = pd.DataFrame(data = dict(zip(MORPHO_NAMES, morpho_par)))
             
@@ -610,6 +611,7 @@ class MakeCatalogs(object):
             dfbands.drop(columns=['id'], inplace=True)
             
             dfbands_matched = dfbands.copy()
+            dfbands_matched = dfbands_matched[dfbands_matched['Z_SPEC'].notna()]
             dfbands_unmatched = dfbands.copy()
 
         if self.survey == 'unions':
@@ -634,8 +636,8 @@ class MakeCatalogs(object):
 
         for band in self._bands:
             if self.survey == 'ps3pi_cfis':
-                dfbands_matched.query("SNR_WIN_%s > 10 & SNR_WIN_%s < 500 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5" %(band,band,band,band) , inplace=True)
-                dfbands_unmatched.query("SNR_WIN_%s > 10 & SNR_WIN_%s < 500 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5" %(band,band,band,band) , inplace=True)
+                dfbands_matched.query("SNR_WIN_%s > 10 & SNR_WIN_%s < 500 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5 & gal_mag_err < 0.5" %(band,band,band,band) , inplace=True)
+                dfbands_unmatched.query("SNR_WIN_%s > 10 & SNR_WIN_%s < 500 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5 & gal_mag_err < 0.5" %(band,band,band,band) , inplace=True)
             else:
                 dfbands_matched.query("SNR_WIN_%s > 10 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5" %(band,band,band) , inplace=True)
                 dfbands_unmatched.query("SNR_WIN_%s > 10 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5" %(band,band,band) , inplace=True)                
@@ -963,7 +965,7 @@ class LearningAlgorithms(object):
         #########################################################################
 
         CFIS_R = pd.read_csv(self._path + 'output/' + self.survey + '/files/' + self.output_name + '.csv')
-        CFIS_R = CFIS_R[['MAG_AUTO_R', 'RA', 'DEC', 'FWHM', 'ELONGATION', 'gal_g1', 'gal_g2', 'gal_gini', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_resolution', 'psf_sigma']].copy()
+        CFIS_R = CFIS_R[['MAG_AUTO_R', 'RA', 'DEC', 'FWHM', 'ELONGATION', 'gal_mag','gal_g1', 'gal_g2', 'gal_gini', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_resolution', 'psf_sigma']].copy()
         CFIS_R = self.gal_g(CFIS_R) #create gal_g = |gal_g1 + gal_g2| and drop gal_g1, gal_g2
         ID = np.arange(0, len(CFIS_R))
         CFIS_R.insert(loc=0, value=ID, column='ID')
@@ -989,7 +991,7 @@ class LearningAlgorithms(object):
         # ID = np.arange(0, len(df_medium_r))
         # df_medium_r.insert(loc=0, value=ID, column='ID')
         
-        df_medium_r = df_medium_r[['MAG_AUTO_R', 'MAG_u', 'i_stk_aper', 'z_stk_aper', 'g_stk_aper', 'FWHM', 'ELONGATION', 'gal_g', 'gal_gini', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_resolution', 'psf_sigma', 'Z_SPEC']].copy()
+        df_medium_r = df_medium_r[['MAG_AUTO_R', 'MAG_u', 'i_stk_aper', 'z_stk_aper', 'g_stk_aper', 'FWHM', 'ELONGATION', 'gal_mag', 'gal_g', 'gal_gini', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_resolution', 'psf_sigma', 'Z_SPEC']].copy()
         df_medium_r.to_csv(self.output_path  + 'files/' + 'MediumDeep_IZG_CFHT_U_CFIS_R_matched_catalog.csv', index=False)
 
         return df_medium_r
