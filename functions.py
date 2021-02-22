@@ -55,13 +55,11 @@ warnings.filterwarnings('ignore')
 # %matplotlib inline
 
 # import shap
-import eli5
-from eli5.sklearn import PermutationImportance
+# import eli5
+# from eli5.sklearn import PermutationImportance
 
 from hyperopt import tpe, hp, fmin, STATUS_OK,Trials
 from hyperopt.pyll.base import scope
-from hyperas import optim
-from hyperas.distributions import choice, uniform
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import RandomizedSearchCV
@@ -1062,8 +1060,10 @@ class LearningAlgorithms(object):
 
 
     def permutation_importance(self, model, method):
-        perm = PermutationImportance(model, random_state=0).fit(self.X_test, self.y_test)
-        eli5.show_weights(perm, feature_names = self.X_test.columns.tolist())
+        #to be written
+        a=1
+        # perm = PermutationImportance(model, random_state=0).fit(self.X_test, self.y_test)
+        # eli5.show_weights(perm, feature_names = self.X_test.columns.tolist())
         # plt.savefig(self.output_path + 'figures/' + self.output_name + '_' + method + '_feature_importance' + '.pdf', bbox_inches='tight', transparent=True)
 
 
@@ -2014,6 +2014,8 @@ class ANNOptimizer(Optimizer):
 
 
     def best_params(self, max_evals = 200):
+        from hyperas import optim
+        from hyperas.distributions import choice, uniform
 
 
         trials = Trials()
@@ -2062,6 +2064,8 @@ def data():
 
 
 def model(X_train, Y_train, X_val, Y_val):
+    from hyperas import optim
+    from hyperas.distributions import choice, uniform
 
     model = tf.keras.models.Sequential()
     model.add(tf.keras.layers.Dense(units=5, activation='relu'))
