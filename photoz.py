@@ -42,7 +42,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--learning", required=False, type=bool, nargs="?", const=False)
     parser.add_argument("-o", "--optimize", required=False, type=str, nargs="?", const='HyperOpt')
     parser.add_argument("-a", "--algorithm", required=False, type=str, nargs="?", const='SVR')
-    parser.add_argument("-i", "--input", required=True, type=str, nargs="?", const='params')
+    parser.add_argument("-i", "--input", required=False, type=str)
 
     args = parser.parse_args()
 
@@ -51,7 +51,10 @@ if __name__ == "__main__":
 #------------------------------------------------------------------#
 
     path = os.getcwd() + '/'
-    params = importlib.import_module(args.input)
+    if args.input == None:
+        import params
+    else:
+        params = importlib.import_module(args.input)
 
     if args.survey == 'test':
         print('Modules loaded properly')
@@ -69,7 +72,7 @@ if __name__ == "__main__":
         #------------------------------------------------------------------#
 
         if args.clean == True:
-            GenFiles = GenerateFiles(args.survey, bands, temp_path)
+            GenFiles = GenerateFiles(args.survey, bands, temp_path, output_name, output_path)
             GenFiles.clean_temp_directories()
             GenFiles.make_directories()
 
@@ -77,7 +80,7 @@ if __name__ == "__main__":
         # # # # # MAKE INDIVIDUAL TILE CATALOGS # # # # #
         #------------------------------------------------------------------#
 
-        elif args.make == True:
+        if args.make == True:
             spectral_path = params.spectral_path
             spectral_names = params.spectral_names
             path_to_tile_run = params.path_to_tile_run
@@ -85,14 +88,12 @@ if __name__ == "__main__":
             vignet = params.vignet
 
 
-            cat = MakeCatalogs(args.survey, bands, temp_path)
+            cat = MakeCatalogs(args.survey, bands, temp_path, output_name, output_path)
 
             for i in range(len(spectral_names)):
                 cat.make_survey_catalog(spectral_path, spectral_names[i])
-                if params.input_path == False:
+                if params.input_path == None:
                     out_dir = os.listdir(path_to_tile_run + args.survey + '/%s/output/'%(spectral_surveys[i]))[-1]
-                    # paste_dir = os.listdir('/n17data/jimenez/shaperun_unions/output_%s/%s/paste_cat_runner/output/'%(spectral_surveys[i], out_dir))
-                    # input_path = '/n17data/jimenez/shaperun_unions/output_%s/%s/paste_cat_runner/output/'%(spectral_surveys[i], out_dir)
                     input_path = path_to_tile_run + args.survey + '/%s/output/%s/paste_cat_runner/output/'%(spectral_surveys[i], out_dir)
                 else:
                     input_path = params.input_path
@@ -104,56 +105,63 @@ if __name__ == "__main__":
         # # # # # JOIN INDIVIDUAL TILE CATALOGS # # # # #
         #------------------------------------------------------------------#
 
-        elif args.join == True:
+        if args.join == True:
             vignet = params.vignet
-            cat = MakeCatalogs(args.survey, bands, temp_path)
-            cat.merge_catalogs(output_name, vignet=vignet)
+            cat = MakeCatalogs(args.survey, bands, temp_path, output_name, output_path)
+            cat.merge_catalogs(vignet=vignet)
 
         #------------------------------------------------------------------#
         # # # # # SAVE FIGURES # # # # #
         #------------------------------------------------------------------#
 
-        elif args.generate_plots == True:
+        if args.generate_plots == True:
             spectral_names = params.spectral_names
-            GenPlot = GeneratePlots(args.survey, bands, temp_path, csv_name=output_name, spectral_names=spectral_names)
-            # GenPlot.plot_d2d()
-            # GenPlot.plot_matched_r_i_i_z()
-            # GenPlot.plot_matched_u_r_r_i()
+            GenPlot = GeneratePlots(args.survey, bands, temp_path, output_name=output_name, spectral_names=spectral_names, output_path=output_path)
             GenPlot.plot_matched_z_spec_hist()
-            # GenPlot.plot_unmatched_r_i_i_z()
-            # GenPlot.plot_unmatched_u_r_r_i()
             GenPlot.plot_unmatched_z_spec_hist()
 
         #------------------------------------------------------------------#
         # # # # # MACHINE LEARNING ALGORITHMS # # # # #
         #------------------------------------------------------------------#
 
-        elif args.learning == True:
+        if args.learning == True:
 
-            GenFiles = GenerateFiles(args.survey, bands, path)
+            GenFiles = GenerateFiles(args.survey, bands, path, output_name, output_path=output_path)
             GenFiles.make_directories(output=True)
 
             path_to_csv = params.path_to_csv
+            spectral_names = params.spectral_names
+            weights = params.weights
+            cv = params.cv
+
             
-            if path_to_csv == 'default':
+            if path_to_csv is None:
                 if args.survey == 'ps3pi_cfis':
-                    path_to_csv = output_path + 'output/' + args.survey + '/files/' + output_name + '.csv'
-                    ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name)
-                    df = ML.merge_cfis_r_cfht_u_medium_deep_i_g_z()
+                    path_to_csv = output_path + 'output/' + args.survey  + '/' + output_name + '/files/' + output_name + '.csv'
+                    ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name, output_path=output_path, cv=cv, n_jobs=args.nodes)
+                    df, df_unmatched = ML.merge_cfis_r_cfht_u_medium_deep_i_g_z()
                     df = ML.preprocess(df, method = args.preprocess)
-                    ML.plot_corrmat(df)
+                    # print(df.head(10))
+                    # ML.plot_corrmat(df)
+                    GenPlot = GeneratePlots(args.survey, bands, temp_path, output_name=output_name, output_path=output_path, spectral_names=spectral_names)
+                    # GenPlot.plot_mags(df, df_unmatched)
+
                 elif args.survey == 'unions':
-                    path_to_csv = output_path + 'output/' + args.survey + '/files/' + output_name + '.csv'
-                    ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name)
+                    path_to_csv = output_path + 'output/' + args.survey  + '/' + output_name + '/files/' + output_name + '.csv'
+                    ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name, output_path=output_path, cv=cv, n_jobs=args.nodes)
                     df = ML.dataframe()
+                    df_unmatched = ML.unmatched_dataframe()
                     df = ML.gal_g()
                     df = ML.preprocess(df, method = args.preprocess)
+                    print(df.head(10))
                     ML.plot_corrmat(df)
+                    GenPlot = GeneratePlots(args.survey, bands, temp_path, output_name=output_name, output_path=output_path, spectral_names=spectral_names)
+                    GenPlot.plot_mags(df, df_unmatched)
                 else:
                     raise TypeError("--survey needs to be set to 'unions' or 'ps3pi_cfis', please specify the full path to your DataFrame")
 
-            elif path_to_csv != 'default':
-                ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name)
+            elif path_to_csv is not None:
+                ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name, output_path=output_path, sample_weight=weights, cv=cv, n_jobs=args.nodes)
                 df = ML.dataframe()
                 df = ML.preprocess(df, method = args.preprocess)
                 ML.plot_corrmat(df)
@@ -164,18 +172,27 @@ if __name__ == "__main__":
             if args.algorithm == 'BEST':
                 best_score = 1
                 best_alg = 'none'
+                if weights == True:
+                    cat = MakeCatalogs(args.survey, bands, temp_path, output_name, output_path)
+                    weights = cat.compute_weights(df, column = 'MAG_AUTO_R')
+                elif type(weights) == str:
+                    weights = np.load(weights)
+                else:
+                    weights = None
                 for alg_name in algs:
                     alg = algs[alg_name]
-                    method = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=False, validation_set=False)
-                    score = method.score(cv=4)
-                    print("%s: "%alg_name + "Sigma: {:.3f} +- {:.4f}, outlier rate: {:.3f} +- {:.3f} % ".format(score[0], score[1], score[2]*100, score[3]*100))
+                    method = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=None, validation_set=False, output_path=output_path, sample_weight=weights, cv=cv, n_jobs=args.nodes)
+                    score = method.score()
+                    print("%s: "%alg_name + "Sigma: {:.3f} ± {:.4f}, outlier rate: {:.3f} ± {:.3f} % ".format(score[0], score[1], score[2]*100, score[3]*100))
                     if score[0]+score[2] < best_score:
                         best_score = score[0]+score[2]
+                        bscore = score
                         best_alg = alg_name
                 alg = algs[best_alg]
-                method = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=False, validation_set=False)
+                method = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=None, validation_set=False, output_path=output_path, sample_weight=weights, cv=cv, n_jobs=args.nodes)
                 method.plot(lim=1.8)
-                print("[%s] "%args.algorithm + "%s: "%best_alg + "Sigma: {:.3f} +- {:.4f}, outlier rate: {:.3f} +- {:.3f} % ".format(score[0], score[1], score[2]*100, score[3]*100))
+                # method.permutation()
+                print("[%s] "%args.algorithm + "%s: "%best_alg + "Sigma: {:.3f} ± {:.4f}, outlier rate: {:.3f} ± {:.3f} % ".format(bscore[0], bscore[1], bscore[2]*100, bscore[3]*100))
 
 
             else:
@@ -185,28 +202,49 @@ if __name__ == "__main__":
                 except:
                     raise TypeError('MLM is not defined')
 
-                def run(alg):
-                    method = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=False, validation_set=False)
-                    method.plot(lim=1.8)
-                    score = method.score(cv=4)
-                    print("%s: "%args.algorithm + "Sigma: {:.3f} +- {:.4f}, outlier rate: {:.3f} +- {:.3f} % ".format(score[0], score[1], score[2]*100, score[3]*100))
+                if weights == True:
+                    cat = MakeCatalogs(args.survey, bands, temp_path, output_name, output_path)
+                    print(df.head(10))
+                    weights = cat.compute_weights(df, column = 'MAG_AUTO_R')
+                elif type(weights) == str:
+                    weights = np.load(weights)
+                else:
+                    weights = None
+                method = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=None, validation_set=False, output_path=output_path, sample_weight=weights, cv=cv, n_jobs=args.nodes)
+                method.plot(lim=1.8)
+                # method.permutation()
+                score = method.score()
+                print("%s: "%args.algorithm + "Sigma: {:.3f} ± {:.4f}, outlier rate: {:.3f} ± {:.3f} % ".format(score[0], score[1], score[2]*100, score[3]*100))
 
-                run(alg)
+
 
         #------------------------------------------------------------------#
         # # # # # OPTIMIZE LEARNING ALGORITHMS # # # # #
         #------------------------------------------------------------------#
 
-        elif args.optimize == 'HyperOpt' or args.optimize == 'RandomSearch' or args.optimize == 'GridSearch':
+        if args.optimize == 'HyperOpt' or args.optimize == 'RandomSearch' or args.optimize == 'GridSearch':
+
+            GenFiles = GenerateFiles(args.survey, bands, path, output_name, output_path=output_path)
+            GenFiles.make_directories(output=True)
 
             path_to_csv = params.path_to_csv
             max_evals = params.max_evals
+            weights = params.weights
+            cv = params.cv
 
             algs = {'RF': RandomForestOptimizer, 'SVR': SVROptimizer, 'XGB': XGBoostOptimizer, 'KRR': KRROptimizer, 'ANN': ANNOptimizer}
             try:
                 alg = algs[args.algorithm]
             except:
                 raise ValueError('Method does not have an optimization algorithm')
+
+            if weights == True:
+                cat = MakeCatalogs(args.survey, bands, temp_path, output_name, output_path)
+                weights = cat.compute_weights(df, column = 'MAG_AUTO_R')
+            elif type(weights) == str:
+                weights = np.load(weights)
+            else:
+                weights = None
 
             if args.algorithm == 'ANN':
 
@@ -225,22 +263,42 @@ if __name__ == "__main__":
 
                 # ML.plot_zphot_zspec(Y_pred.flatten(), method='ANN_Opt', lim=1.8)
 
-                ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name)
+                ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name, output_path=output_path, sample_weight=weights, cv=cv, n_jobs=args.nodes)
                 df = ML.dataframe()
                 df = ML.preprocess(df, method = args.preprocess)
                 ML.plot_corrmat(df)
-                ModelOptimizer = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=False, validation_set=False)
+                ModelOptimizer = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=None, validation_set=False)
                 _, sigma, eta = ModelOptimizer.best_params(max_evals=10)
-                print("%s Opt : "%args.algorithm + "Sigma: {:.3f}, outlier rate: {:.3f} % ".format(sigma, eta*100))      
+                print("%s Opt : "%args.algorithm + "Sigma: {:.3f}, outlier rate: {:.3f} % ".format(sigma, eta*100))    
 
-            else:          
-                ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name)
-                df = ML.dataframe()
+            if path_to_csv is None:
+                path_to_csv = output_path + 'output/' + args.survey  + '/' + output_name + '/files/' + output_name + '.csv'
+                ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name, output_path=output_path, sample_weight=weights, cv=cv, n_jobs=args.nodes)
+                df, df_unmatched = ML.merge_cfis_r_cfht_u_medium_deep_i_g_z()
                 df = ML.preprocess(df, method = args.preprocess)
+                print(df.head(10))
                 ML.plot_corrmat(df)
-                ModelOptimizer = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=False, validation_set=False)
+                ModelOptimizer = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=None, validation_set=False, output_path=output_path, sample_weight=weights, cv=cv, n_jobs=args.nodes)
                 _, sigma, eta = ModelOptimizer.best_params(max_evals=max_evals, method=args.optimize)
                 print("%s %s : "%(args.algorithm, args.optimize) + "Sigma: {:.3f}, outlier rate: {:.3f} % ".format(sigma, eta*100))
+
+            elif path_to_csv is not None:
+                ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name, output_path=output_path, sample_weight=weights, cv=cv, n_jobs=args.nodes)
+                df = ML.dataframe()
+                df = ML.preprocess(df, method = args.preprocess)
+                ML.plot_corrmat(df)  
+                ModelOptimizer = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=None, validation_set=False, output_path=output_path, sample_weight=weights, cv=cv, n_jobs=args.nodes)
+                _, sigma, eta = ModelOptimizer.best_params(max_evals=max_evals, method=args.optimize)
+                print("%s %s : "%(args.algorithm, args.optimize) + "Sigma: {:.3f}, outlier rate: {:.3f} % ".format(sigma, eta*100))
+
+            # else:          
+            #     ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name)
+            #     df = ML.dataframe()
+            #     df = ML.preprocess(df, method = args.preprocess)
+            #     ML.plot_corrmat(df)
+            #     ModelOptimizer = alg(survey = args.survey, bands = bands, output_name = output_name, dataframe=df, path_to_csv=False, validation_set=False)
+            #     _, sigma, eta = ModelOptimizer.best_params(max_evals=max_evals, method=args.optimize)
+            #     print("%s %s : "%(args.algorithm, args.optimize) + "Sigma: {:.3f}, outlier rate: {:.3f} % ".format(sigma, eta*100))
         
             
 #------------------------------------------------------------------#

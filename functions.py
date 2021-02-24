@@ -33,34 +33,16 @@ from astropy.io import fits
 from astropy.coordinates import SkyCoord, match_coordinates_sky
 from astropy.stats import mad_std
 
-
 from tqdm import tqdm
-
-import tensorflow as tf
-import tensorflow.keras as tfk
-# import keras
-# from tensorflow.keras import regularizers
-
-# from sklearn.preprocessing import LabelEncoder
-# from sklearn.preprocessing import OneHotEncoder
-# from sklearn.impute import SimpleImputer
-
-
-# from scipy.stats import norm
-# from scipy import stats
-
 
 import warnings
 warnings.filterwarnings('ignore')
 # %matplotlib inline
 
-# import shap
-# import eli5
-# from eli5.sklearn import PermutationImportance
-
 from hyperopt import tpe, hp, fmin, STATUS_OK,Trials
 from hyperopt.pyll.base import scope
 
+from sklearn.model_selection import cross_validate
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.model_selection import GridSearchCV
@@ -88,7 +70,7 @@ class GenerateFiles(object):
     """[summary]
     """
 
-    def __init__(self, survey, bands, temp_path):
+    def __init__(self, survey, bands, temp_path, output_name, output_path=None):
         """[summary]
 
         Args:
@@ -101,6 +83,11 @@ class GenerateFiles(object):
         self.survey = survey
         self._bands = bands
         self.temp_path = temp_path
+        self.output_name = output_name
+        if output_path is None:
+            self.output_path = self._path
+        else:
+            self.output_path = output_path
 
 
     def make_directory(self, path_to_file):
@@ -137,11 +124,12 @@ class GenerateFiles(object):
             self.make_directory(self.temp_path + self.survey + '/vignet/array')
 
         elif output == True:
-            self.make_directory(self._path + 'output')
-            self.make_directory(self._path + 'output/' + self.survey)
-            self.make_directory(self._path + 'output/' + self.survey + '/files')
-            self.make_directory(self._path + 'output/' + self.survey + '/files/ML')
-            self.make_directory(self._path + 'output/' + self.survey + '/figures')
+            self.make_directory(self.output_path + 'output')
+            self.make_directory(self.output_path + 'output/' + self.survey)
+            self.make_directory(self.output_path + 'output/' + self.survey + '/' + self.output_name)
+            self.make_directory(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files')
+            self.make_directory(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/ML')
+            self.make_directory(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/figures')
 
 
 
@@ -202,20 +190,24 @@ class GenerateFiles(object):
 
 class GeneratePlots(object):
 
-    def __init__(self, survey, bands, temp_path, csv_name, spectral_names, output_name='match_cat'):
+    def __init__(self, survey, bands, temp_path, output_name, spectral_names, figure_name='match_cat', output_path=None):
 
         self._path = os.getcwd() + '/'
         self.survey = survey
         self._bands = bands
         self.temp_path = temp_path
-        self.csv_name = csv_name
+        self.figure_name = figure_name
         self.output_name = output_name
         self.spectral_names = spectral_names
-        self.output_path = self._path + 'output/' + self.survey + '/figures/'
+        if output_path is None:
+            self.output_path = self._path
+        else:
+            self.output_path = output_path
+        self.figure_path = self.output_path + 'output/' + self.survey + '/' + self.output_name + '/figures/'
 
-        self.df_matched = pd.read_csv(self._path + 'output/' + self.survey + '/files/' + self.csv_name + '.csv')
-        self.df_unmatched = pd.read_csv(self._path + 'output/' + self.survey + '/files/' + self.csv_name + '_unmatched'+'.csv')
-        # self.df_d2d = pd.read_csv(self._path + 'output/' + self.survey + '/files/' + self.csv_name +'_d2d'+'.csv')
+        self.df_matched = pd.read_csv(self.output_path + 'output/' + self.survey + '/files/' + self.output_name + '/' + self.output_name + '.csv')
+        self.df_unmatched = pd.read_csv(self.output_path + 'output/' + self.survey + '/files/' + self.output_name + '/' + self.output_name + '_unmatched'+'.csv')
+        # self.df_d2d = pd.read_csv(self.output_path + 'output/' + self.survey + '/files/' + self.output_name +'_d2d'+'.csv')
 
 
     def plot_d2d(self):
@@ -234,10 +226,35 @@ class GeneratePlots(object):
 
         ax.hist(np.array(self.df_d2d['d2d'].values)*3600, bins = 50)
 
-        plt.savefig(self.output_path + self.output_name + '.pdf', bbox_inches='tight', transparent=True)
+        plt.savefig(self.figure_path + self.figure_name + '.pdf', bbox_inches='tight', transparent=True)
         plt.show()
         plt.close()
 
+    def plot_mags(self, df_matched, df_unmatched):
+        """
+        
+        """
+
+        mags = ['MAG_AUTO_R', 'MAG_u', 'i_stk_aper', 'z_stk_aper', 'g_stk_aper']
+
+        fig =plt.figure(figsize=(8,20), tight_layout=False)
+
+        for (i,mag) in enumerate(mags):
+            ax = fig.add_subplot(511+i)
+            ax.set_facecolor('white')
+            ax.grid(True, color='grey', lw=0.5)
+            ax.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
+            if i == len(mags)-1:
+                ax.set_xlabel('Magnitude', fontsize=20)
+            ax.set_ylabel(mag, fontsize=20)
+
+            ax.hist(df_unmatched[mag], density=True, bins=50, label='unmatched', log=True, color='orange')
+            ax.hist(df_matched[mag], density=True, bins=50, label='matched', log=True, alpha=0.8)
+            legend = ax.legend(loc='best', shadow=True, fontsize='x-large')
+
+        plt.savefig(self.figure_path + 'Mags_' + self.figure_name + '.pdf', bbox_inches='tight', transparent=True)
+        plt.show()
+        plt.close()
 
     def plot_matched_z_spec_hist(self):
         """
@@ -259,7 +276,7 @@ class GeneratePlots(object):
         legend = ax.legend(loc='best', shadow=True, fontsize='x-large')
         legend.get_frame().set_facecolor('C0')
 
-        plt.savefig(self.output_path + self.output_name + '_z_hist_' + '.pdf', bbox_inches='tight', transparent=True)
+        plt.savefig(self.figure_path + self.figure_name + '_z_hist' + '.pdf', bbox_inches='tight', transparent=True)
         plt.show()
         plt.close()
 
@@ -284,7 +301,7 @@ class GeneratePlots(object):
         ax.set_ylim([-2, 4])
 
         plt.suptitle(r'$\mathrm{R-I\; vs \;I-Z \;for\; matched\; galaxies}$', fontsize=20, y=1.0)
-        plt.savefig(self.output_path + 'R-I_I-Z' + '_matched' + '.pdf', bbox_inches='tight', transparent=True)
+        plt.savefig(self.figure_path + 'R-I_I-Z' + '_matched' + '.pdf', bbox_inches='tight', transparent=True)
         plt.show()
         plt.close()
 
@@ -309,7 +326,7 @@ class GeneratePlots(object):
         ax.set_ylim([0, 5])
 
         plt.suptitle(r'$\mathrm{U-R\; vs \;R-I \;for\; matched\; galaxies}$', fontsize=20, y=1.0)
-        plt.savefig(self.output_path + 'U-R_R-I' + '_matched' + '.pdf', bbox_inches='tight', transparent=True)
+        plt.savefig(self.figure_path + 'U-R_R-I' + '_matched' + '.pdf', bbox_inches='tight', transparent=True)
         plt.show()
         plt.close()
 
@@ -335,7 +352,7 @@ class GeneratePlots(object):
         ax.set_ylim([-2, 4])
 
         plt.suptitle(r'$\mathrm{R-I\; vs \;I-Z \;for\; all\; galaxies}$', fontsize=20, y=1.0)
-        plt.savefig(self.output_path + 'R-I_I-Z' + '_unmatched' + '.pdf', bbox_inches='tight', transparent=True)
+        plt.savefig(self.figure_path + 'R-I_I-Z' + '_unmatched' + '.pdf', bbox_inches='tight', transparent=True)
         plt.show()
         plt.close()
 
@@ -361,7 +378,7 @@ class GeneratePlots(object):
         ax.set_ylim([0, 5])
 
         plt.suptitle(r'$\mathrm{U-R\; vs \;R-I \;for\; all\; galaxies}$', fontsize=20, y=1.0)
-        plt.savefig(self.output_path + 'U-R_R-I' + '_unmatched' + '.pdf', bbox_inches='tight', transparent=True)
+        plt.savefig(self.figure_path + 'U-R_R-I' + '_unmatched' + '.pdf', bbox_inches='tight', transparent=True)
         plt.show()
         plt.close()
 
@@ -391,7 +408,7 @@ class GeneratePlots(object):
         legend.get_frame().set_facecolor('C0')
 
 
-        plt.savefig(self.output_path + 'cat_' + '_z_hist_' + '.pdf', bbox_inches='tight', transparent=True)
+        plt.savefig(self.figure_path + 'cat_' + 'z_hist' + '.pdf', bbox_inches='tight', transparent=True)
         plt.show()
         plt.close()
 
@@ -399,7 +416,7 @@ class GeneratePlots(object):
 
 class MakeCatalogs(object):
 
-    def __init__(self, survey, bands, temp_path):
+    def __init__(self, survey, bands, temp_path, output_name, output_path=None):
         """[summary]
 
         Args:
@@ -412,6 +429,11 @@ class MakeCatalogs(object):
         self.survey = survey
         self._bands = bands
         self.temp_path = temp_path
+        self.output_name = output_name
+        if output_path is None:
+            self.output_path = self._path
+        else:
+            self.output_path = output_path
 
 
     def make_survey_catalog(self, spectral_path, spectral_name):
@@ -533,25 +555,26 @@ class MakeCatalogs(object):
         #------------------------------------------------------------------#
         # # # # # Spatial coordinates matching # # # # #
         #------------------------------------------------------------------#
-
-        scatalog_sub = SkyCoord(ra=df_to_cut['RA'].values, dec=df_to_cut['DEC'].values, unit='deg')
-        pcatalog_sub = SkyCoord(ra=df_Z['RA'].values, dec=df_Z['DEC'].values, unit='deg')
-        idx, d2d, _ = match_coordinates_sky(scatalog_sub, pcatalog_sub, nthneighbor=1)
-
-        tol = 0.3*u.arcsecond #threshold to consider whether or not two galaxies are the same
-        ismatched = d2d < tol
-
-        # try:
-
-        #------------------------------------------------------------------#
-        # # # # # Create matched dataframe with redshift # # # # #
-        #------------------------------------------------------------------#
-
-        df_d2d = pd.DataFrame(data={'ismatched': ismatched, 'idx': idx, 'd2d': d2d, 'RA': df_to_cut['RA'].values,'DEC':df_to_cut['DEC'].values})
-        df_d2d.query("ismatched == True", inplace=True)
-        df_d2d.drop(columns=['ismatched'], inplace=True)
-
         if self.survey == 'unions':
+
+            scatalog_sub = SkyCoord(ra=df_to_cut['RA'].values, dec=df_to_cut['DEC'].values, unit='deg')
+            pcatalog_sub = SkyCoord(ra=df_Z['RA'].values, dec=df_Z['DEC'].values, unit='deg')
+            idx, d2d, _ = match_coordinates_sky(scatalog_sub, pcatalog_sub, nthneighbor=1)
+
+            tol = 0.3*u.arcsecond #threshold to consider whether or not two galaxies are the same
+            ismatched = d2d < tol
+
+            # try:
+
+            #------------------------------------------------------------------#
+            # # # # # Create matched dataframe with redshift # # # # #
+            #------------------------------------------------------------------#
+
+            df_d2d = pd.DataFrame(data={'ismatched': ismatched, 'idx': idx, 'd2d': d2d, 'RA': df_to_cut['RA'].values,'DEC':df_to_cut['DEC'].values})
+            df_d2d.query("ismatched == True", inplace=True)
+            df_d2d.drop(columns=['ismatched'], inplace=True)
+
+        
             try:
                 idx_sub = np.array([(i,ide) for (i,ide) in enumerate(idx) if ismatched[i] == True])[:,1]
             except:
@@ -604,13 +627,16 @@ class MakeCatalogs(object):
             MORPHO_NAMES = ['id', 'gal_mag', 'gal_mag_err', 'gal_flux', 'gal_flux_err', 'gal_g1', 'gal_g1_err', 'gal_g2', 'gal_g2_err', 'gal_gini', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_resolution', 'psf_sigma']
             morpho_par = [HDU_tile['R_PSF'].data[param].tolist() for param in MORPHO_NAMES]
             df_morph = pd.DataFrame(data = dict(zip(MORPHO_NAMES, morpho_par)))
+
+            mv = LearningAlgorithms.missing_data(self, df_morph)
+            print(mv.head(10))
             
             dfbands = pd.merge(df_mag, df_morph, indicator=True, on='id', how='outer').query('_merge=="both"').drop('_merge', axis=1)
             dfbands.drop(columns=['id'], inplace=True)
             
             dfbands_matched = dfbands.copy()
             dfbands_matched = dfbands_matched[dfbands_matched['Z_SPEC'].notna()]
-            dfbands_unmatched = dfbands.copy()
+            dfbands_unmatched = df_mag.copy()
 
         if self.survey == 'unions':
             dfbands = df_mag.copy()
@@ -635,7 +661,7 @@ class MakeCatalogs(object):
         for band in self._bands:
             if self.survey == 'ps3pi_cfis':
                 dfbands_matched.query("SNR_WIN_%s > 10 & SNR_WIN_%s < 500 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5 & gal_mag_err < 0.5" %(band,band,band,band) , inplace=True)
-                dfbands_unmatched.query("SNR_WIN_%s > 10 & SNR_WIN_%s < 500 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5 & gal_mag_err < 0.5" %(band,band,band,band) , inplace=True)
+                dfbands_unmatched.query("SNR_WIN_%s > 10 & SNR_WIN_%s < 500 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5" %(band,band,band,band) , inplace=True)
             else:
                 dfbands_matched.query("SNR_WIN_%s > 10 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5" %(band,band,band) , inplace=True)
                 dfbands_unmatched.query("SNR_WIN_%s > 10 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5" %(band,band,band) , inplace=True)                
@@ -730,11 +756,11 @@ class MakeCatalogs(object):
         np.save(self.temp_path + self.survey + '/vignet/array/vignet_%s'% file_name[:-5], X)
 
 
-    def merge_catalogs(self, output_name, vignet=True):
-        """Merges individual tile catalogs
+    def merge_catalogs(self, vignet=True):
+        """[summary]
 
         Args:
-            output_name ([type]): [description]
+            vignet (bool, optional): [description]. Defaults to True.
         """
 
         #------------------------------------------------------------------#
@@ -752,7 +778,7 @@ class MakeCatalogs(object):
         df_matched_short.query("isdup == False", inplace=True)
         df_matched_short.drop(columns=['isdup'], inplace=True)
         # Save file
-        df_matched_short.to_csv(self._path + 'output/' + self.survey + '/files/' + output_name + '.csv', index=False)
+        df_matched_short.to_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name + '.csv', index=False)
 
         if vignet == True:
             # Import temp files
@@ -770,7 +796,7 @@ class MakeCatalogs(object):
                     vignet_nodup[k,:,:,:] = vignet[i,:,:,:]
                     k += 1
             # Save file
-            np.save(self._path + 'output/' + self.survey + '/files/' + output_name, vignet_nodup)
+            np.save(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name, vignet_nodup)
 
 
         # # Import temp files
@@ -784,7 +810,7 @@ class MakeCatalogs(object):
         # df_matched_d2d.query("isdup == False", inplace=True)
         # df_matched_d2d.drop(columns=['isdup', 'RA', 'DEC'], inplace=True)
         # # Save file
-        # df_matched_d2d.to_csv(self._path + 'output/' + self.survey + '/files/' + output_name + '_d2d' + '.csv', index=False)
+        # df_matched_d2d.to_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name + '_d2d' + '.csv', index=False)
 
         # Import temp files
         path_unmatched_short = self.temp_path + self.survey + '/unmatched/'
@@ -797,15 +823,48 @@ class MakeCatalogs(object):
         df_unmatched_short.query("isdup == False", inplace=True)
         df_unmatched_short.drop(columns=['isdup'], inplace=True)
         # Save file
-        df_unmatched_short.to_csv(self._path + 'output/' + self.survey + '/files/' + output_name + '_unmatched' + '.csv', index=False)
+        df_unmatched_short.to_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name + '_unmatched' + '.csv', index=False)
 
+    
+    def compute_weights(self, df_matched, column='MAG_AUTO_R'):
+        df_unmatched = pd.read_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name + '_unmatched' + '.csv')
+        n = len(df_matched)//10
+        hist, bins_edge = np.histogram(df_unmatched[column].values, bins=n, density=True)
+        bin_min = bins_edge[0]
+        bin_max = bins_edge[-1]
+        step = (bin_max - bin_min)/n
+
+        ID = np.arange(0, len(df_matched))
+        df_matched.insert(loc=0, value=ID, column='ID')
+        df_matched.sort_values(by=column, inplace=True)
+
+        weights = []
+        n_min = 0
+        for i in range(len(df_matched)):
+            for k in range(n_min, n):
+                if bin_min+step*(k+1) <= df_matched[column].values[i]:
+                    continue
+                else:
+                    weights.append(hist[k])
+                    n_min = k
+                    break 
+            
+
+        df_matched['weights'] = weights/np.sum(weights)
+        df_matched.sort_values(by='ID', inplace=True)
+        weights = df_matched['weights'].to_numpy()
+        df_matched.drop(columns=['weights', 'ID'], inplace=True)
+
+        np.save(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + 'Weights_' + self.output_name, weights)
+
+        return weights
 
 
 
 
 class LearningAlgorithms(object):
 
-    def __init__(self, survey, bands, output_name, path_to_csv=False, dataframe=False, validation_set = False):
+    def __init__(self, survey, bands, output_name, output_path=None, path_to_csv=None, dataframe=pd.DataFrame(data={}), sample_weight=None, validation_set=False, cv=4, n_jobs=-1):
         """[summary]
 
         Args:
@@ -817,32 +876,42 @@ class LearningAlgorithms(object):
         self._path = os.getcwd() + '/'
         self.survey = survey
         self._bands = bands
-        if type(path_to_csv) != bool:
-            self.df = pd.read_csv(path_to_csv)
-        elif type(dataframe) != bool:
-            self.df = dataframe
-        else:
-            raise('Error: neither path_to_csv nor dataframe where specified')
-        self.output_path = self._path + 'output/' + self.survey + '/'       
         self.output_name = output_name
-        # self.y = self.df[['Z_SPEC']].copy().to_numpy().flatten()
-        # self.X = self.df
-        # self.X.drop(columns=['Z_SPEC'], inplace=True)
-        
-        self.train, self.test = train_test_split(self.df, test_size = 0.2, random_state=0)
-        # self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size = 0.2, random_state=0)
+        if path_to_csv is None:
+            if dataframe.empty == True:
+                raise TypeError('dataframe must be specified if path_to_csv=None')
+            else:
+                self.df = dataframe
+        elif path_to_csv is not None:
+            # try:
+            self.df = pd.read_csv(path_to_csv)
+            # except:
+                # raise TypeError('neither path_to_csv nor dataframe were specified')
+        if output_path is None:
+            self.output_path = self._path + 'output/' + self.survey + '/' + self.output_name + '/'       
+        else:
+            self.output_path = output_path + 'output/' + self.survey + '/' + self.output_name + '/'
+        self.n_jobs = n_jobs
+        self.sample_weight = sample_weight
+        self.cv = cv
+        if sample_weight is None:
+            self.train, self.test = train_test_split(self.df, test_size = 0.2, random_state=0)
+            self.sample_weight_train = None
+        else:
+            self.train, self.test, self.sample_weight_train, _ = train_test_split(self.df, self.sample_weight, test_size = 0.2, random_state=0)
+
         self.X_train = self.train.iloc[:,:-1]
         self.y_train = self.train.iloc[:,-1]
         self.X_test = self.test.iloc[:,:-1]
         self.y_test = self.test.iloc[:,-1]
         self.val = validation_set
         if validation_set == True:
-            self.X_train, self.X_val, self.y_train, self.y_val = train_test_split(self.X_train, self.y_train, test_size=0.2, random_state=0)
-        # self.output_name = output_name
-        # self.mag_type = mag_type
-        # self.dataset = pd.read_csv(self._path + 'output/' + self.survey + '/files/' + self.output_name + '.csv')
-        # self.X = self.dataset[['%s_%s'%(mag, band) for mag in self.mag_type for band in self._bands]].copy()
-        # self.y = self.dataset[['Z_SPEC']].copy()
+            if sample_weight is None:
+                self.X_train, self.X_val, self.y_train, self.y_val = train_test_split(self.X_train, self.y_train, test_size=0.2, random_state=0)
+                self.sample_weight_train = None
+            else:
+                self.X_train, self.X_val, self.y_train, self.y_val, self.sample_weight_train, _ = train_test_split(self.X_train, self.y_train, self.sample_weight, test_size=0.2, random_state=0)
+
 
     def data(self):
         if self.val == True:
@@ -850,53 +919,30 @@ class LearningAlgorithms(object):
         else:
             return self.X_train, self.X_test, self.y_train, self.y_test
 
+    def weight_train(self):
+        return self.sample_weight_train
+
     
     def dataframe(self):
         return self.df
+
+    def unmatched_dataframe(self):
+        return pd.read_csv(self.output_path + 'output/' + self.survey + '/files/' + self.output_name + '_unmatched' + '.csv')
 
 
     def merge_cfis_r_cfht_u_medium_deep_i_g_z(self):
 
         CFHT = pd.read_csv(self._path+'catalogs/CFHTLens_2021-01-25T12_32_19.tsv', delimiter='\t')
-        ID = np.arange(0, len(CFHT))
-        CFHT.insert(loc=0, value=ID, column='ID')
+        CFHT = CFHT.replace(-99, 0)
+        CFHT = CFHT.replace(99, 0)
+        # CFHT['MAG_i'] = CFHT['MAG_i'] + CFHT['MAG_y']
+        # CFHT['MAGERR_i'] = CFHT['MAGERR_i'] + CFHT['MAGERR_y']
+        # CFHT['EXTINCTION_i'] = CFHT['EXTINCTION_i'] + CFHT['EXTINCTION_y']
+        CFHT = CFHT.replace(0, np.nan)
+        CFHT.query("MAGERR_u < 0.5", inplace=True)
+        CFHT.rename(columns={"ALPHA_J2000": "RA", "DELTA_J2000": "DEC"}, inplace=True)
+        CFHT = CFHT[['MAG_u', 'RA', 'DEC']].copy()
 
-        HDU = fits.open(self._path + 'catalogs/alldeep.egs.uniq.2012jun13' + '.fits')
-        RA = HDU[1].data['ra'].tolist()
-        DEC = HDU[1].data['dec'].tolist()
-        Z_SPEC = HDU[1].data['z'].tolist()
-        deep_2_3 = pd.DataFrame(data={'RA': RA, 'DEC': DEC, 'Z_SPEC': Z_SPEC})
-
-        #########################################################################
-
-        scatalog_sub = SkyCoord(ra=deep_2_3['RA'].values, dec=deep_2_3['DEC'].values, unit='deg')
-        pcatalog_sub = SkyCoord(ra=CFHT['ALPHA_J2000'].values, dec=CFHT['DELTA_J2000'].values, unit='deg')
-        idx, d2d, _ = match_coordinates_sky(scatalog_sub, pcatalog_sub, nthneighbor=1)
-
-        tol = 0.3*u.arcsecond #threshold to consider whether or not two galaxies are the same
-        ismatched = d2d < tol
-
-        deep_2_3['ismatched'], deep_2_3['ID'] = ismatched, idx
-
-        CFHT_matched = pd.merge(deep_2_3, CFHT, indicator=True, how='outer').query('_merge=="both"').drop('_merge', axis=1)
-        CFHT_matched.query("ismatched == True", inplace=True)
-
-        CFHT_matched = CFHT_matched.replace(-99, 0)
-        CFHT_matched = CFHT_matched.replace(99, 0)
-
-        CFHT_matched['MAG_i'] = CFHT_matched['MAG_i'] + CFHT_matched['MAG_y']
-        CFHT_matched['MAGERR_i'] = CFHT_matched['MAGERR_i'] + CFHT_matched['MAGERR_y']
-        CFHT_matched['EXTINCTION_i'] = CFHT_matched['EXTINCTION_i'] + CFHT_matched['EXTINCTION_y']
-        CFHT_matched = CFHT_matched.replace(0, np.nan)
-
-        CFHT_matched.drop(columns=['ALPHA_J2000', 'DELTA_J2000', 'ismatched', 'ID', 'MAG_y', 'MAGERR_y', 'EXTINCTION_y'], inplace=True)
-
-        ID = np.arange(0, len(CFHT_matched))
-        CFHT_matched.insert(loc=0, value=ID, column='ID')
-
-        #########################################################################
-
-        deep_2_3 = pd.DataFrame(data={'RA': RA, 'DEC': DEC, 'Z_SPEC': Z_SPEC})
         mediumdeep = pd.read_csv(self._path+'catalogs/cat_psmd_deep23.rsv', delimiter=',')
 
         mediumdeep = mediumdeep[['ra', 'dec', 'i_stk_aper', 'z_stk_aper', 'g_stk_aper', 'g_stk_aper_err', 'i_stk_aper_err', 'z_stk_aper_err']].copy()
@@ -907,42 +953,38 @@ class LearningAlgorithms(object):
                     mediumdeep.query("%s_%s_%s_err < 0.5"%(band,s,a), inplace=True)
 
         ID = np.arange(0, len(mediumdeep))
-        # mediumdeep.drop(columns=['ID', 'g_flags', 'i_flags', 'r_flags','z_flags'], inplace=True)
         mediumdeep.drop(columns=['g_stk_aper_err', 'i_stk_aper_err', 'z_stk_aper_err'], inplace=True)
         mediumdeep.insert(loc=0, value=ID, column='ID')
 
-        scatalog_sub = SkyCoord(ra=deep_2_3['RA'].values, dec=deep_2_3['DEC'].values, unit='deg')
+        scatalog_sub = SkyCoord(ra=CFHT['RA'].values, dec=CFHT['DEC'].values, unit='deg')
         pcatalog_sub = SkyCoord(ra=mediumdeep['ra'].values, dec=mediumdeep['dec'].values, unit='deg')
-        idx, d2d, d3d = match_coordinates_sky(scatalog_sub, pcatalog_sub, nthneighbor=1)
+        idx, d2d, _ = match_coordinates_sky(scatalog_sub, pcatalog_sub, nthneighbor=1)
 
         tol = 0.3*u.arcsecond #threshold to consider whether or not two galaxies are the same
         ismatched = d2d < tol
 
-        deep_2_3['ismatched'], deep_2_3['ID'] = ismatched, idx
+        CFHT['ismatched'], CFHT['ID'] = ismatched, idx
 
         mediumdeep.drop(columns=['ra', 'dec'], inplace=True)
 
-        df = pd.merge(deep_2_3, mediumdeep, indicator=True, on='ID', how='outer').query('_merge=="both"').drop('_merge', axis=1)
+        df = pd.merge(CFHT, mediumdeep, indicator=True, on='ID', how='outer').query('_merge=="both"').drop('_merge', axis=1)
 
         df.query("ismatched == True", inplace=True)
         df.drop(columns=['ismatched', 'ID'], inplace=True)
 
-        # ID = np.arange(0, len(df))
-        # df.insert(loc=0, value=ID, column='ID')
+        ID = np.arange(0, len(df))
+        df.insert(loc=0, value=ID, column='ID')
 
-        #########################################################################
+        # Save matched
 
-        CFHT_copy = CFHT_matched[['ID', 'DEC', 'RA', 'MAG_u', 'MAGERR_u']].copy()
-        CFHT_copy.query("MAGERR_u < 0.5", inplace=True)
-        CFHT_copy.drop(columns=['MAGERR_u'], inplace=True)
-
-        
-
-
-        # df.drop(columns=['ID'], inplace=True)
+        CFIS_R = pd.read_csv(self.output_path + 'files/' + self.output_name + '.csv')
+        CFIS_R = CFIS_R[['MAG_AUTO_R' ,'RA', 'DEC', 'FWHM', 'ELONGATION', 'gal_mag','gal_g1', 'gal_g2', 'gal_gini', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_resolution', 'psf_sigma', 'Z_SPEC']].copy()
+        CFIS_R = self.gal_g(CFIS_R) #create gal_g = |gal_g1 + gal_g2| and drop gal_g1, gal_g2
+        ID = np.arange(0, len(CFIS_R))
+        CFIS_R.insert(loc=0, value=ID, column='ID')
 
         scatalog_sub = SkyCoord(ra=df['RA'].values, dec=df['DEC'].values, unit='deg')
-        pcatalog_sub = SkyCoord(ra=CFHT_copy['RA'].values, dec=CFHT_copy['DEC'].values, unit='deg')
+        pcatalog_sub = SkyCoord(ra=CFIS_R['RA'].values, dec=CFIS_R['DEC'].values, unit='deg')
         idx, d2d, _ = match_coordinates_sky(scatalog_sub, pcatalog_sub, nthneighbor=1)
 
         tol = 0.3*u.arcsecond #threshold to consider whether or not two galaxies are the same
@@ -950,49 +992,44 @@ class LearningAlgorithms(object):
 
         df['ismatched'], df['ID'] = ismatched, idx
 
-        CFHT_copy.drop(columns=['RA', 'DEC'], inplace=True)
+        CFIS_R.drop(columns=['RA', 'DEC'], inplace=True)
 
-        df_medium = pd.merge(df, CFHT_copy, indicator=True, on='ID', how='outer').query('_merge=="both"').drop('_merge', axis=1)
+        df_medium = pd.merge(df, CFIS_R, indicator=True, on='ID', how='outer').query('_merge=="both"').drop('_merge', axis=1)
 
         df_medium.query("ismatched == True", inplace=True)
         df_medium.drop(columns=['ismatched', 'ID'], inplace=True)
 
-        # ID = np.arange(0, len(df_medium))
-        # df_medium.insert(loc=0, value=ID, column='ID')
+        df_medium = df_medium[['MAG_AUTO_R', 'MAG_u', 'i_stk_aper', 'z_stk_aper', 'g_stk_aper', 'Z_SPEC']].copy()
+        df_medium.to_csv(self.output_path + 'files/' + 'MediumDeep_IZG_CFHT_U_CFIS_R_catalog.csv', index=False)
 
-        #########################################################################
+        # Save unmatched 
 
-        CFIS_R = pd.read_csv(self._path + 'output/' + self.survey + '/files/' + self.output_name + '.csv')
-        CFIS_R = CFIS_R[['MAG_AUTO_R', 'RA', 'DEC', 'FWHM', 'ELONGATION', 'gal_mag','gal_g1', 'gal_g2', 'gal_gini', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_resolution', 'psf_sigma']].copy()
-        CFIS_R = self.gal_g(CFIS_R) #create gal_g = |gal_g1 + gal_g2| and drop gal_g1, gal_g2
-        ID = np.arange(0, len(CFIS_R))
-        CFIS_R.insert(loc=0, value=ID, column='ID')
 
-        # df_medium.drop(columns=['ID'], inplace=True)
+        CFIS_R_unmatched = pd.read_csv(self.output_path + 'files/' + self.output_name + '_unmatched' + '.csv')
+        CFIS_R_unmatched = CFIS_R_unmatched[['MAG_AUTO_R', 'RA', 'DEC']].copy()
+        ID = np.arange(0, len(CFIS_R_unmatched))
+        CFIS_R_unmatched.insert(loc=0, value=ID, column='ID')
 
-        scatalog_sub = SkyCoord(ra=df_medium['RA'].values, dec=df_medium['DEC'].values, unit='deg')
-        pcatalog_sub = SkyCoord(ra=CFIS_R['RA'].values, dec=CFIS_R['DEC'].values, unit='deg')
-        idx, d2d, d3d = match_coordinates_sky(scatalog_sub, pcatalog_sub, nthneighbor=1)
+        scatalog_sub = SkyCoord(ra=df['RA'].values, dec=df['DEC'].values, unit='deg')
+        pcatalog_sub = SkyCoord(ra=CFIS_R_unmatched['RA'].values, dec=CFIS_R_unmatched['DEC'].values, unit='deg')
+        idx, d2d, _ = match_coordinates_sky(scatalog_sub, pcatalog_sub, nthneighbor=1)
 
         tol = 0.3*u.arcsecond #threshold to consider whether or not two galaxies are the same
         ismatched = d2d < tol
 
-        df_medium['ismatched'], df_medium['ID'] = ismatched, idx
+        df['ismatched'], df['ID'] = ismatched, idx
 
-        CFIS_R.drop(columns=['RA', 'DEC'], inplace=True)
+        CFIS_R_unmatched.drop(columns=['RA', 'DEC'], inplace=True)
 
-        df_medium_r = pd.merge(df_medium, CFIS_R, indicator=True, on='ID', how='outer').query('_merge=="both"').drop('_merge', axis=1)
+        df_medium_unmatched = pd.merge(df, CFIS_R_unmatched, indicator=True, on='ID', how='outer').query('_merge=="both"').drop('_merge', axis=1)
 
-        df_medium_r.query("ismatched == True", inplace=True)
-        df_medium_r.drop(columns=['ismatched', 'ID'], inplace=True)
+        df_medium_unmatched.query("ismatched == True", inplace=True)
+        df_medium_unmatched.drop(columns=['ismatched', 'ID'], inplace=True)
 
-        # ID = np.arange(0, len(df_medium_r))
-        # df_medium_r.insert(loc=0, value=ID, column='ID')
-        
-        df_medium_r = df_medium_r[['MAG_AUTO_R', 'MAG_u', 'i_stk_aper', 'z_stk_aper', 'g_stk_aper', 'FWHM', 'ELONGATION', 'gal_mag', 'gal_g', 'gal_gini', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_resolution', 'psf_sigma', 'Z_SPEC']].copy()
-        df_medium_r.to_csv(self.output_path  + 'files/' + 'MediumDeep_IZG_CFHT_U_CFIS_R_matched_catalog.csv', index=False)
+        df_medium_unmatched = df_medium_unmatched[['MAG_AUTO_R', 'MAG_u', 'i_stk_aper', 'z_stk_aper', 'g_stk_aper']].copy()
+        df_medium_unmatched.to_csv(self.output_path  + 'files/' + 'MediumDeep_IZG_CFHT_U_CFIS_R_catalog_unmatched.csv', index=False)
 
-        return df_medium_r
+        return df_medium, df_medium_unmatched
 
 
     def gal_g(self, df):
@@ -1003,7 +1040,7 @@ class LearningAlgorithms(object):
         
 
     def preprocess(self, df, method='drop'):
-        if method == None:
+        if method is None:
             return df
         else:
             df = df.replace([-1, -10, -99], np.nan)
@@ -1035,7 +1072,7 @@ class LearningAlgorithms(object):
 
         missing_data = self.missing_data(df)
         if missing_data.empty == True:
-            df.to_csv(self.output_path + 'files/' + self.output_name + '_preprocessed.csv')
+            df.to_csv(self.output_path + 'files/' + self.output_name + '_preprocessed.csv', index=False)
             return df
         else:
             print('Error: Dataframe contains NaNs, preprocess function could not handle them.')
@@ -1057,14 +1094,6 @@ class LearningAlgorithms(object):
         all_data_na = all_data_na.drop(all_data_na[all_data_na == 0].index).sort_values(ascending=False)[:30]
         missing_data = pd.DataFrame({'Missing Ratio' :all_data_na})
         return missing_data
-
-
-    def permutation_importance(self, model, method):
-        #to be written
-        a=1
-        # perm = PermutationImportance(model, random_state=0).fit(self.X_test, self.y_test)
-        # eli5.show_weights(perm, feature_names = self.X_test.columns.tolist())
-        # plt.savefig(self.output_path + 'figures/' + self.output_name + '_' + method + '_feature_importance' + '.pdf', bbox_inches='tight', transparent=True)
 
 
     def plot_corrmat(self, df=pd.DataFrame(data={})):
@@ -1113,9 +1142,30 @@ class LearningAlgorithms(object):
         sigma = 1.4826*np.median( np.abs( delta_z - np.median(delta_z) ) )
         outlier = np.abs(delta_z) > 0.15
         outlier_rate = len([x for x in outlier.ravel() if x==True])/len(delta_z.ravel())
-        return sigma + outlier_rate
+        return outlier_rate + sigma
 
-    def cross_validation(self, model, params={}, cv=4, scaler=False, linear=False, ann=False):
+
+
+    def permutation_importance(self, model, params, scaler=False, linear=False, ann=False):
+
+        dataframe = self.df
+        columns = dataframe.columns
+        score, std = self.cross_validation(model=model, params=params, metric=self.sigma_eta_score, scaler=scaler, linear=linear, ann=ann, dataframe=dataframe)  
+        df = pd.DataFrame(columns=['Weight', 'Feature', 'score'])  
+        for column in columns[:-1]:
+            df_shuffle = dataframe.copy()
+            df_shuffle[column] = df_shuffle[column].sample(frac=1).values
+            mscore, mstd = self.cross_validation(model=model, params=params, metric=self.sigma_eta_score, scaler=scaler, linear=linear, ann=ann, dataframe=df_shuffle)
+            df = pd.concat((df, pd.DataFrame(data={'Weight':['{:.3f}±{:.3f}'.format(mscore-score, np.abs(std+mstd))], 'Feature': [column], 'score':score-mscore})))
+        df.sort_values(by=['score'], inplace=True)
+        df.drop(columns=['score'], inplace=True)
+        df.to_csv(self.output_path + 'files/' + 'Feature_Weights_' + self.output_name + '.csv', index=False)
+
+        print(df.head(10))
+        
+
+
+    def cross_validation(self, model, params={}, metric=False, scaler=False, linear=False, ann=False, dataframe=pd.DataFrame(data={})):
         """[summary]
 
         Args:
@@ -1128,29 +1178,41 @@ class LearningAlgorithms(object):
             [type]: [description]
         """
         
-        df = self.df.sample(frac=1).reset_index(drop=True)
+        if dataframe.empty == True:
+            df = self.df.sample(frac=1).reset_index(drop=True)
+        else:
+            df = dataframe.sample(frac=1).reset_index(drop=True)
+
         X = df.iloc[:,:-1]
         y = df.iloc[:,-1]
 
         df_X_list = []
         df_y_list = []
+        weight_list = []
         n = len(X)
-        for i in range(0,cv):
-            if i < cv-1:
-                df_X_list.append(X.iloc[i*int(n/cv):(i+1)*int(n/cv), :])
-                df_y_list.append(y.iloc[i*int(n/cv):(i+1)*int(n/cv)])
-            if i == cv-1:
-                df_X_list.append(X.iloc[i*int(n/cv):, :])
-                df_y_list.append(y.iloc[i*int(n/cv):])
-        
-        sigma_list, eta_list = [], []
-        for i in tqdm(range(0,cv)):
+        for i in range(0,self.cv):
+            if i < self.cv-1:
+                df_X_list.append(X.iloc[i*int(n/self.cv):(i+1)*int(n/self.cv), :])
+                df_y_list.append(y.iloc[i*int(n/self.cv):(i+1)*int(n/self.cv)])
+                if self.sample_weight is not None:
+                    weight_list.append(self.sample_weight[i*int(n/self.cv):(i+1)*int(n/self.cv)])
+            if i == self.cv-1:
+                df_X_list.append(X.iloc[i*int(n/self.cv):, :])
+                df_y_list.append(y.iloc[i*int(n/self.cv):])
+                if self.sample_weight is not None:
+                    weight_list.append(self.sample_weight[i*int(n/self.cv):])
+
+        sigma_list, eta_list, score_list = [], [], []
+        for i in tqdm(range(0,self.cv)):
 
             X_test = df_X_list[i]
             y_test = df_y_list[i]
             X_train = pd.concat(np.array([(j,X) for (j,X) in enumerate(df_X_list) if i != j])[:,1])
             y_train = pd.concat(np.array([(j,y) for (j,y) in enumerate(df_y_list) if i != j])[:,1])
-
+            if self.sample_weight is not None:
+                weight_train = np.concatenate(np.array([(j,w) for (j,w) in enumerate(weight_list) if i != j])[:,1])
+            elif self.sample_weight is None:
+                weight_train = None
 
             if scaler == True:
                 sc_X = StandardScaler()
@@ -1159,31 +1221,43 @@ class LearningAlgorithms(object):
 
             if ann == True:
                 regressor = model
-                regressor.fit(X_train, y_train, batch_size = 32, epochs = 100)
+                regressor.fit(X_train, y_train, batch_size = 32, epochs = 100, verbose=0, sample_weight=weight_train)
             else:
                 if linear == True:
                     regressor = make_pipeline(RobustScaler(), model(**params))
-                    regressor.fit(X_train, y_train)
+                    kwargs = {regressor.steps[-1][0] + '__sample_weight': weight_train}
+                    regressor.fit(X_train, y_train, **kwargs)
                 elif linear == False:
                     regressor = model(**params)
-                    regressor.fit(X_train, y_train)
+                    regressor.fit(X_train, y_train, sample_weight=weight_train)
             y_pred = regressor.predict(X_test)
-            sigma, eta = self.sigma_eta(y_test, y_pred.flatten())
-            sigma_list.append(sigma)
-            eta_list.append(eta)
-        
-        return np.mean(sigma_list), np.std(sigma_list), np.mean(eta_list), np.std(eta_list)
+            if metric == False:
+                sigma, eta = self.sigma_eta(y_test, y_pred.flatten())
+                sigma_list.append(sigma)
+                eta_list.append(eta)
+            else:
+                score_list.append(metric(y_test, y_pred.flatten())) 
+        if metric == False:
+            return np.mean(sigma_list), np.std(sigma_list), np.mean(eta_list), np.std(eta_list)
+        else: 
+            return np.mean(score_list), np.std(score_list)
 
-    def model(self, regressor, scaler=False):
-        if scaler == False:
-            regressor.fit(self.X_train, self.y_train)
+    def model(self, regressor, scaler=False, linear=False):
+        if linear == True:
+            kwargs = {regressor.steps[-1][0] + '__sample_weight': self.sample_weight_train}
+            regressor.fit(self.X_train, self.y_train, **kwargs)
             y_pred = regressor.predict(self.X_test)
-        if scaler == True:
-            sc_X = StandardScaler()
-            X_train = sc_X.fit_transform(self.X_train)
-            X_test = sc_X.transform(self.X_test)
-            regressor.fit(X_train, self.y_train)
-            y_pred = regressor.predict(X_test)
+        else:
+            if scaler == False:
+                regressor.fit(self.X_train, self.y_train, sample_weight=self.sample_weight_train)
+                y_pred = regressor.predict(self.X_test)
+            if scaler == True:
+                sc_X = StandardScaler()
+                X_train = sc_X.fit_transform(self.X_train)
+                X_test = sc_X.transform(self.X_test)
+                regressor.fit(X_train, self.y_train, sample_weight=self.sample_weight_train)
+                y_pred = regressor.predict(X_test)
+
         y_test = self.y_test
 
         df = pd.DataFrame(data={'y_pred': y_pred, 'y_test': y_test})
@@ -1194,8 +1268,8 @@ class LearningAlgorithms(object):
 
 class RandomForest(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, path_to_csv, dataframe, validation_set):
-        super().__init__(survey, bands, output_name, path_to_csv=path_to_csv, dataframe=dataframe, validation_set=validation_set)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
         self.method = 'RF'
         self.params = {'n_estimators': 86, 'max_depth': 11, 'n_jobs':-1}
 
@@ -1211,7 +1285,7 @@ class RandomForest(LearningAlgorithms):
         return LearningAlgorithms.model(self, regressor)
 
 
-    def score(self, cv=4):
+    def score(self):
         """[summary]
 
         Args:
@@ -1220,20 +1294,22 @@ class RandomForest(LearningAlgorithms):
         Returns:
             [type]: np.mean(sigma_list), np.std(sigma_list), np.mean(eta_list), np.std(eta_list)
         """
-        return LearningAlgorithms.cross_validation(self, model=RandomForestRegressor, params=self.params, cv=cv)
+        return LearningAlgorithms.cross_validation(self, model=RandomForestRegressor, params=self.params)
 
 
     def plot(self, lim):
-        regressor, y_pred, _ = self.model()
+        _, y_pred, _ = self.model()
         LearningAlgorithms.plot_zphot_zspec(self, y_pred, self.method, lim)
-        LearningAlgorithms.permutation_importance(self, model=regressor, method=self.method)
+
+    def permutation(self):
+        LearningAlgorithms.permutation_importance(self,  model=RandomForestRegressor, params=self.params, scaler=False, linear=False, ann=False)
         
 
 
 class SupportVectorRegression(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, path_to_csv, dataframe, validation_set):
-        super().__init__(survey, bands, output_name, path_to_csv=path_to_csv, dataframe=dataframe, validation_set=validation_set)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
         self.method = 'SVR'
         self.params = {'C':1.0, 'cache_size':200, 'coef0':0.0, 'epsilon':0.1, 'gamma':'scale', 'kernel':'rbf', 'max_iter':-1, 'shrinking':True, 'tol':0.001}
 
@@ -1244,7 +1320,7 @@ class SupportVectorRegression(LearningAlgorithms):
         return LearningAlgorithms.model(self, regressor, scaler=True)
 
 
-    def score(self, cv=4):
+    def score(self):
         """[summary]
 
         Args:
@@ -1253,19 +1329,21 @@ class SupportVectorRegression(LearningAlgorithms):
         Returns:
             [type]: np.mean(sigma_list), np.std(sigma_list), np.mean(eta_list), np.std(eta_list)
         """
-        return LearningAlgorithms.cross_validation(self, model=SVR, params=self.params, cv=cv)
+        return LearningAlgorithms.cross_validation(self, model=SVR, params=self.params)
 
 
     def plot(self, lim):
-        regressor, y_pred, _ = self.model()
+        _, y_pred, _ = self.model()
         LearningAlgorithms.plot_zphot_zspec(self, y_pred, self.method, lim)
-        LearningAlgorithms.permutation_importance(self, model=regressor, method=self.method)
+
+    def permutation(self):
+        LearningAlgorithms.permutation_importance(self,  model=SVR, params=self.params, scaler=True, linear=False, ann=False)
 
 
 class LightGBM(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, path_to_csv, dataframe, validation_set):
-        super().__init__(survey, bands, output_name, path_to_csv=path_to_csv, dataframe=dataframe, validation_set=validation_set)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
         self.method = 'LGB'
         self.params = {'objective':'regression','num_leaves':5,
                               'learning_rate':0.05, 'n_estimators':720,
@@ -1283,7 +1361,7 @@ class LightGBM(LearningAlgorithms):
         return LearningAlgorithms.model(self, regressor, scaler=False)
 
 
-    def score(self, cv=4):
+    def score(self):
         """[summary]
 
         Args:
@@ -1292,18 +1370,20 @@ class LightGBM(LearningAlgorithms):
         Returns:
             [type]: np.mean(sigma_list), np.std(sigma_list), np.mean(eta_list), np.std(eta_list)
         """
-        return LearningAlgorithms.cross_validation(self, model=lgb.LGBMRegressor, params=self.params, cv=cv)
+        return LearningAlgorithms.cross_validation(self, model=lgb.LGBMRegressor, params=self.params)
 
 
     def plot(self, lim):
-        regressor, y_pred, _ = self.model()
+        _, y_pred, _ = self.model()
         LearningAlgorithms.plot_zphot_zspec(self, y_pred, self.method, lim)
-        LearningAlgorithms.permutation_importance(self, model=regressor, method=self.method)
+
+    def permutation(self):
+        LearningAlgorithms.permutation_importance(self,  model=lgb.LGBMRegressor, params=self.params, scaler=False, linear=False, ann=False)
 
 class XGBoost(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, path_to_csv, dataframe, validation_set):
-        super().__init__(survey, bands, output_name, path_to_csv=path_to_csv, dataframe=dataframe, validation_set=validation_set)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
         self.method = 'XGB'
         self.params = {'max_depth':3, 'n_estimators':2200, 'random_state':0, 'nthread': -1, 'n_jobs':-1}
 
@@ -1314,7 +1394,7 @@ class XGBoost(LearningAlgorithms):
         return LearningAlgorithms.model(self, regressor, scaler=False)
 
 
-    def score(self, cv=4):
+    def score(self):
         """[summary]
 
         Args:
@@ -1323,19 +1403,21 @@ class XGBoost(LearningAlgorithms):
         Returns:
             [type]: np.mean(sigma_list), np.std(sigma_list), np.mean(eta_list), np.std(eta_list)
         """
-        return LearningAlgorithms.cross_validation(self, model=xgb.XGBRegressor, params=self.params, cv=cv)
+        return LearningAlgorithms.cross_validation(self, model=xgb.XGBRegressor, params=self.params)
 
 
     def plot(self, lim):
         regressor, y_pred, _ = self.model()
         LearningAlgorithms.plot_zphot_zspec(self, y_pred, self.method, lim)
-        LearningAlgorithms.permutation_importance(self, model=regressor, method=self.method)
+
+    def permutation(self):
+        LearningAlgorithms.permutation_importance(self,  model=xgb.XGBRegressor, params=self.params, scaler=False, linear=False, ann=False)
 
 
 class GradientBoostingRegression(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, path_to_csv, dataframe, validation_set):
-        super().__init__(survey, bands, output_name, path_to_csv=path_to_csv, dataframe=dataframe, validation_set=validation_set)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
         self.method = 'GBR'
         self.params = {'n_estimators':3000, 'learning_rate':0.05,
                                    'max_depth':4, 'max_features':'sqrt',
@@ -1349,7 +1431,7 @@ class GradientBoostingRegression(LearningAlgorithms):
         return LearningAlgorithms.model(self, regressor, scaler=False)
 
 
-    def score(self, cv=4):
+    def score(self):
         """[summary]
 
         Args:
@@ -1358,19 +1440,21 @@ class GradientBoostingRegression(LearningAlgorithms):
         Returns:
             [type]: np.mean(sigma_list), np.std(sigma_list), np.mean(eta_list), np.std(eta_list)
         """
-        return LearningAlgorithms.cross_validation(self, model=GradientBoostingRegressor, params=self.params, cv=cv)
+        return LearningAlgorithms.cross_validation(self, model=GradientBoostingRegressor, params=self.params)
 
 
     def plot(self, lim):
         regressor, y_pred, _ = self.model()
         LearningAlgorithms.plot_zphot_zspec(self, y_pred, self.method, lim)
-        LearningAlgorithms.permutation_importance(self, model=regressor, method=self.method)
+
+    def permutation(self):
+        LearningAlgorithms.permutation_importance(self,  model=GradientBoostingRegressor, params=self.params, scaler=False, linear=False, ann=False)
 
 
 class KernelRidgeRegression(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, path_to_csv, dataframe, validation_set):
-        super().__init__(survey, bands, output_name, path_to_csv=path_to_csv, dataframe=dataframe, validation_set=validation_set)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
         self.method = 'KRR'
         self.params = {'alpha':0.6, 'kernel':'polynomial', 'degree':2, 'coef0':2.5}
 
@@ -1382,7 +1466,7 @@ class KernelRidgeRegression(LearningAlgorithms):
         return LearningAlgorithms.model(self, regressor, scaler=True)
 
 
-    def score(self, cv=4):
+    def score(self):
         """[summary]
 
         Args:
@@ -1391,18 +1475,20 @@ class KernelRidgeRegression(LearningAlgorithms):
         Returns:
             [type]: np.mean(sigma_list), np.std(sigma_list), np.mean(eta_list), np.std(eta_list)
         """
-        return LearningAlgorithms.cross_validation(self, model=KernelRidge, params=self.params, cv=cv)
+        return LearningAlgorithms.cross_validation(self, model=KernelRidge, params=self.params)
 
 
     def plot(self, lim):
         regressor, y_pred, _ = self.model()
         LearningAlgorithms.plot_zphot_zspec(self, y_pred, self.method, lim)
-        LearningAlgorithms.permutation_importance(self, model=regressor, method=self.method)
+
+    def permutation(self):
+        LearningAlgorithms.permutation_importance(self,  model=KernelRidge, params=self.params, scaler=True, linear=False, ann=False)
 
 class ElasticNetRegression(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, path_to_csv, dataframe, validation_set):
-        super().__init__(survey, bands, output_name, path_to_csv=path_to_csv, dataframe=dataframe, validation_set=validation_set)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
         self.method = 'ENET'
         self.params={'alpha':0.0005, 'l1_ratio':.9, 'random_state':0}
 
@@ -1410,10 +1496,10 @@ class ElasticNetRegression(LearningAlgorithms):
     def model(self):
 
         regressor = make_pipeline(RobustScaler(), ElasticNet(**self.params))
-        return LearningAlgorithms.model(self, regressor, scaler=False)
+        return LearningAlgorithms.model(self, regressor, scaler=False, linear=True)
 
 
-    def score(self, cv=4):
+    def score(self):
         """[summary]
 
         Args:
@@ -1422,19 +1508,21 @@ class ElasticNetRegression(LearningAlgorithms):
         Returns:
             [type]: np.mean(sigma_list), np.std(sigma_list), np.mean(eta_list), np.std(eta_list)
         """
-        return LearningAlgorithms.cross_validation(self, model=ElasticNet, params=self.params, cv=cv, linear=True)
+        return LearningAlgorithms.cross_validation(self, model=ElasticNet, params=self.params, linear=True)
 
 
     def plot(self, lim):
         regressor, y_pred, _ = self.model()
         LearningAlgorithms.plot_zphot_zspec(self, y_pred, self.method, lim)
-        LearningAlgorithms.permutation_importance(self, model=regressor, method=self.method)
+
+    def permutation(self):
+        LearningAlgorithms.permutation_importance(self,  model=ElasticNet, params=self.params, scaler=False, linear=True, ann=False)
 
 
 class LassoRegression(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, path_to_csv, dataframe, validation_set):
-        super().__init__(survey, bands, output_name, path_to_csv=path_to_csv, dataframe=dataframe, validation_set=validation_set)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
         self.method = 'LASSO'
         self.params={'alpha': 0.0005, 'random_state':0}
 
@@ -1442,10 +1530,10 @@ class LassoRegression(LearningAlgorithms):
     def model(self):
 
         regressor = make_pipeline(RobustScaler(), Lasso(**self.params))
-        return LearningAlgorithms.model(self, regressor, scaler=False)
+        return LearningAlgorithms.model(self, regressor, scaler=False, linear=True)
 
 
-    def score(self, cv=4):
+    def score(self):
         """[summary]
 
         Args:
@@ -1454,22 +1542,27 @@ class LassoRegression(LearningAlgorithms):
         Returns:
             [type]: np.mean(sigma_list), np.std(sigma_list), np.mean(eta_list), np.std(eta_list)
         """
-        return LearningAlgorithms.cross_validation(self, model=Lasso, params=self.params, cv=cv, linear=True)
+        return LearningAlgorithms.cross_validation(self, model=Lasso, params=self.params, linear=True)
 
 
     def plot(self, lim):
         regressor, y_pred, _ = self.model()
         LearningAlgorithms.plot_zphot_zspec(self, y_pred, self.method, lim)
-        LearningAlgorithms.permutation_importance(self, model=regressor, method=self.method)
+
+    def permutation(self):
+        LearningAlgorithms.permutation_importance(self,  model=Lasso, params=self.params, scaler=False, linear=True, ann=False)
 
 
 class ArtificialNeuralNetwork(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, path_to_csv, dataframe, validation_set):
-        super().__init__(survey, bands, output_name, path_to_csv=path_to_csv, dataframe=dataframe, validation_set=validation_set)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
         self.method = 'ANN'
 
     def ann(self):
+        import tensorflow as tf
+        import tensorflow.keras as tfk
+
         ann = tf.keras.models.Sequential()
         ann.add(tf.keras.layers.Dense(units=5, activation='relu'))
         ann.add(tf.keras.layers.Dense(units=6, activation='relu'))
@@ -1488,7 +1581,7 @@ class ArtificialNeuralNetwork(LearningAlgorithms):
 
         ann = self.ann()
         
-        ann.fit(X_train, self.y_train, batch_size = 32, epochs = 100, verbose=0)
+        ann.fit(X_train, self.y_train, batch_size = 32, epochs = 100, verbose=0, sample_weight=self.sample_weight_train)
         y_pred = ann.predict(X_test)
 
         y_test = self.y_test
@@ -1498,7 +1591,7 @@ class ArtificialNeuralNetwork(LearningAlgorithms):
         return ann, y_pred, y_test
 
 
-    def score(self, cv=4):
+    def score(self):
         """[summary]
 
         Args:
@@ -1507,26 +1600,31 @@ class ArtificialNeuralNetwork(LearningAlgorithms):
         Returns:
             [type]: np.mean(sigma_list), np.std(sigma_list), np.mean(eta_list), np.std(eta_list)
         """
-        return LearningAlgorithms.cross_validation(self, model=self.ann(), cv=cv, scaler=True, ann=True)
+        return LearningAlgorithms.cross_validation(self, model=self.ann(), scaler=True, ann=True)
 
 
     def plot(self, lim):
         regressor, y_pred, _ = self.model()
         LearningAlgorithms.plot_zphot_zspec(self, y_pred.flatten(), self.method, lim)
-        # LearningAlgorithms.permutation_importance(self, model=regressor, method=self.method)
+
+    def permutation(self):
+        LearningAlgorithms.permutation_importance(self, model=self.ann, linear=False, scaler=True, ann=True)
 
 
 class ConvolutionalNeuralNetwork(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, path_to_csv, dataframe, validation_set):
-        super().__init__(survey, bands, output_name, path_to_csv=path_to_csv, dataframe=dataframe, validation_set=validation_set)
-        self.X = np.load(self._path + 'output/' + self.survey + '/files/' + output_name + '.npy')
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
+        self.X = np.load(self.output_path + 'output/' + self.survey + '/files/' + output_name + '.npy')
         self.X_train, self.X_test = train_test_split(self.X, test_size = 0.2, random_state=0)
         self.X_train, self.X_val = train_test_split(self.X_train, test_size = 0.2, random_state=0)
         self.method = 'CNN'
 
 
     def model(self):
+        import tensorflow as tf
+        import tensorflow.keras as tfk
+
         model = tfk.models.Sequential()
         model.add(tfk.layers.Conv2D(32, kernel_size=5, padding='same',
                                     input_shape=(51,51,len(self._bands)), activation='elu', strides=2))
@@ -1560,6 +1658,8 @@ class ConvolutionalNeuralNetwork(LearningAlgorithms):
         return model
 
     def cnn_model(self):
+        import tensorflow as tf
+        import tensorflow.keras as tfk
         scaling_train, scaling_test, scaling_val = [], [], []
         X_train = np.ndarray((len(self.X_train),51,51,len(self._bands)))
         X_val = np.ndarray((len(self.X_val),51,51,len(self._bands)))
@@ -1616,8 +1716,8 @@ class ConvolutionalNeuralNetwork(LearningAlgorithms):
 
 class Optimizer(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, path_to_csv, dataframe, validation_set):
-        super().__init__(survey, bands, output_name, path_to_csv=path_to_csv, dataframe=dataframe, validation_set=validation_set)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
 
     def sigma_eta_score(self, y_test, y_pred):
         delta_z = (y_test - y_pred)/(np.ones_like(y_test) + y_test)
@@ -1626,7 +1726,8 @@ class Optimizer(LearningAlgorithms):
         outlier_rate = len([x for x in outlier.ravel() if x==True])/len(delta_z.ravel())
         return sigma + outlier_rate
 
-    def cross_validation(self, metric, model, cv=4, scaler=False, linear=False, ann=False):
+
+    def cross_validation(self, metric, model, scaler=False, linear=False, ann=False):
         """[summary]
 
         Args:
@@ -1641,21 +1742,30 @@ class Optimizer(LearningAlgorithms):
 
         df_X_list = []
         df_y_list = []
+        weight_list = []
         n = len(self.X_train)
-        for i in range(0,cv):
-            if i < cv-1:
-                df_X_list.append(self.X_train.iloc[i*int(n/cv):(i+1)*int(n/cv), :])
-                df_y_list.append(self.y_train.iloc[i*int(n/cv):(i+1)*int(n/cv)])
-            if i == cv-1:
-                df_X_list.append(self.X_train.iloc[i*int(n/cv):, :])
-                df_y_list.append(self.y_train.iloc[i*int(n/cv):])
+        for i in range(0,self.cv):
+            if i < self.cv-1:
+                df_X_list.append(self.X_train.iloc[i*int(n/self.cv):(i+1)*int(n/self.cv), :])
+                df_y_list.append(self.y_train.iloc[i*int(n/self.cv):(i+1)*int(n/self.cv)])
+                if self.sample_weight is not None:
+                    weight_list.append(self.sample_weight[i*int(n/self.self.cv):(i+1)*int(n/self.self.cv)])
+            if i == self.cv-1:
+                df_X_list.append(self.X_train.iloc[i*int(n/self.cv):, :])
+                df_y_list.append(self.y_train.iloc[i*int(n/self.cv):])
+                if self.sample_weight is not None:
+                    weight_list.append(self.sample_weight[i*int(n/self.self.cv):])
         
         score_list = []
-        for i in range(0,cv):
+        for i in range(0,self.cv):
             X_test = df_X_list[i]
             y_test = df_y_list[i]
             X_train = pd.concat(np.array([(j,X) for (j,X) in enumerate(df_X_list) if i != j])[:,1])
             y_train = pd.concat(np.array([(j,y) for (j,y) in enumerate(df_y_list) if i != j])[:,1])
+            if self.sample_weight is not None:
+                weight_train = np.concatenate(np.array([(j,w) for (j,w) in enumerate(weight_list) if i != j])[:,1])
+            elif self.sample_weight is None:
+                weight_train = None
 
             if scaler == True:
                 sc_X = StandardScaler()
@@ -1663,16 +1773,15 @@ class Optimizer(LearningAlgorithms):
                 X_test = sc_X.transform(X_test)
 
             if ann == True:
-                model.fit(X_train, y_train, batch_size = 32, epochs = 100)
+                model.fit(X_train, y_train, batch_size = 32, epochs = 100, verbose=0, sample_weight=weight_train)
             else:
                 if linear == True:
                     model = make_pipeline(RobustScaler(), model)
-                    model.fit(X_train, y_train)
+                    kwargs = {model.steps[-1][0] + '__sample_weight': weight_train}
+                    model.fit(X_train, y_train, **kwargs)
                     
                 elif linear == False:
-                    # regressor = model
-                    # regressor.set_params(**params)
-                    model.fit(X_train, y_train)
+                    model.fit(X_train, y_train, sample_weight=weight_train)
             y_pred = model.predict(X_test)
 
             score = metric(y_test, y_pred)
@@ -1683,8 +1792,8 @@ class Optimizer(LearningAlgorithms):
 
 class RandomForestOptimizer(Optimizer):
 
-    def __init__(self, survey, bands, output_name, path_to_csv, dataframe, validation_set):
-        super().__init__(survey, bands, output_name, path_to_csv, dataframe, validation_set)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
+        super().__init__(survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs)
         self.method = 'RF_Opt'
 
 
@@ -1702,7 +1811,7 @@ class RandomForestOptimizer(Optimizer):
         # y_pred = model.predict(self.X_val)
         # score = Optimizer.sigma_eta_score(self, self.y_val, y_pred)
 
-        score =  Optimizer.cross_validation(self, model=RandomForestRegressor(**params), metric=self.sigma_eta_score, cv=4)
+        score =  Optimizer.cross_validation(self, model=RandomForestRegressor(**params), metric=self.sigma_eta_score)
         return score.mean()
 
     def optimize(self, trial, max_evals = 200):
@@ -1752,7 +1861,7 @@ class RandomForestOptimizer(Optimizer):
         rf = RandomForestRegressor()
         # Random search of parameters, using 3 fold cross validation, 
         # search across 100 different combinations, and use all available cores
-        rf_grid = GridSearchCV(estimator = rf, param_grid = grid, scoring=score, cv = 3, verbose=2, n_jobs = -1)
+        rf_grid = GridSearchCV(estimator = rf, param_grid = grid, scoring=score, cv = self.cv, verbose=2, n_jobs = -1)
         # Fit the random search model
         rf_grid.fit(self.X_train, self.y_train)
 
@@ -1791,7 +1900,7 @@ class RandomForestOptimizer(Optimizer):
         rf = RandomForestRegressor()
         # Random search of parameters, using 3 fold cross validation, 
         # search across 100 different combinations, and use all available cores
-        rf_random = RandomizedSearchCV(estimator = rf, param_distributions = random_grid, scoring=score, n_iter = max_evals, cv = 3, verbose=2, random_state=0, n_jobs = -1)
+        rf_random = RandomizedSearchCV(estimator = rf, param_distributions = random_grid, scoring=score, n_iter = max_evals, cv = self.cv, verbose=2, random_state=0, n_jobs = -1)
         # Fit the random search model
         rf_random.fit(self.X_train, self.y_train)
 
@@ -1819,8 +1928,8 @@ class RandomForestOptimizer(Optimizer):
 
 class SVROptimizer(Optimizer):
 
-    def __init__(self, survey, bands, output_name, path_to_csv, dataframe, validation_set):
-        super().__init__(survey, bands, output_name, path_to_csv, dataframe, validation_set)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
+        super().__init__(survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs)
         self.method = 'SVR_Opt'
 
     def objective(self, params):
@@ -1834,7 +1943,7 @@ class SVROptimizer(Optimizer):
         # y_pred = model.predict(self.X_val)
         # score = Optimizer.sigma_eta_score(self, self.y_val, y_pred)
 
-        score =  Optimizer.cross_validation(self, model=SVR(**params), metric=self.sigma_eta_score, cv=4, scaler=True)
+        score =  Optimizer.cross_validation(self, model=SVR(**params), metric=self.sigma_eta_score, scaler=True)
         return score.mean()
 
     def optimize(self, trial, max_evals = 200):
@@ -1858,9 +1967,9 @@ class SVROptimizer(Optimizer):
 
 class XGBoostOptimizer(Optimizer):
 
-    def __init__(self, survey, bands, output_name, path_to_csv, dataframe, validation_set):
-        super().__init__(survey, bands, output_name, path_to_csv, dataframe, validation_set)
-
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
+        super().__init__(survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs)
+        self.method = 'XGB_Opt'
     
     def objective(self, params):
         est=int(params['n_estimators'])
@@ -1869,7 +1978,7 @@ class XGBoostOptimizer(Optimizer):
         
         params = {'n_estimators': est, 'max_depth':md, 'learning_rate': learning}
 
-        score =  Optimizer.cross_validation(self, model=xgb.XGBRegressor(**params), metric=self.sigma_eta_score, cv=4)
+        score =  Optimizer.cross_validation(self, model=xgb.XGBRegressor(**params), metric=self.sigma_eta_score)
         return score.mean()
 
     def optimize(self, trial, max_evals=200):
@@ -1894,8 +2003,8 @@ class XGBoostOptimizer(Optimizer):
 
 class KRROptimizer(Optimizer):
 
-    def __init__(self, survey, bands, output_name, path_to_csv, dataframe, validation_set):
-        super().__init__(survey, bands, output_name, path_to_csv, dataframe, validation_set)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
+        super().__init__(survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs)
         self.method = 'KRR_Opt'
 
     def objective(self, params):
@@ -1910,7 +2019,7 @@ class KRROptimizer(Optimizer):
         # y_pred = model.predict(self.X_val)
         # score = Optimizer.sigma_eta_score(self, self.y_val, y_pred)
 
-        score =  Optimizer.cross_validation(self, model=KernelRidge(**params), metric=self.sigma_eta_score, cv=4, scaler=True)
+        score =  Optimizer.cross_validation(self, model=KernelRidge(**params), metric=self.sigma_eta_score, scaler=True)
         return score.mean()
 
     def optimize(self, trial, max_evals = 200):
@@ -1936,8 +2045,8 @@ class KRROptimizer(Optimizer):
 
 class ANNOptimizer(Optimizer):
 
-    def __init__(self, survey, bands, output_name, path_to_csv, dataframe, validation_set):
-        super().__init__(survey, bands, output_name, path_to_csv, dataframe, validation_set)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
+        super().__init__(survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs)
         self.method = 'ANN_Opt'
 
     # @staticmethod
@@ -2064,6 +2173,8 @@ def data():
 
 
 def model(X_train, Y_train, X_val, Y_val):
+    import tensorflow as tf
+    import tensorflow.keras as tfk
     from hyperas import optim
     from hyperas.distributions import choice, uniform
 
