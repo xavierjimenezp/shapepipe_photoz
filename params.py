@@ -29,8 +29,13 @@ temp_path = '/n17data/jimenez/temp/'
 spectral_path = '/n17data/jimenez/spectral_catalogs/'
 spectral_names = ['alldeep.egs.uniq.2012jun13']
 path_to_tile_run = '/n17data/jimenez/shaperun/'
+<<<<<<< HEAD
 input_path = None
 spectral_surveys = ['deep23']
+=======
+input_path = False
+spectral_surveys = ['unmatched_deep23']
+>>>>>>> fb9442cd3319b7aad330ab8dbd283d1c99dbfaca
 vignet = False
 
 #------------------------------------------------------------------#

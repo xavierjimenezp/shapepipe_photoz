@@ -41,7 +41,9 @@ Tutorial to run a simple example.
 
 ## Preprocessing
 
-The following commands take a ShapePipe output tile catalog in example/ps3pi_cfis/tile/ and preprocess it into a .csv catalog. Redshift distribution plots are also generated and can be found in output/ps3pi_cfis/figures/.
+The following commands take a ShapePipe output tile catalog in 'example/ps3pi_cfis/tile/' and preprocess it into a .csv catalog. Redshift distribution plots are also generated and can be found in 'output/ps3pi_cfis/figures/'.
+
+> **Note**: CFIS data is not public, please put your ShapePipe output catalog into 'example/ps3pi_cfis/tile/'.
 
 `python photoz.py --survey ps3pi_cfis --clean True --input params_ps3pi_cfis`
 
@@ -55,11 +57,11 @@ The following commands take a ShapePipe output tile catalog in example/ps3pi_cfi
 
 The following command runs the **random forest** (RF) algorithm with default hyperparameters through the catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv  catalog using the example/params_ps3pi_cfis.py config file.
 
-`python photoz.py --survey ps3pi_cfis --learning True --algorithm RF --input params_ps3pi_cfis`
+`python photoz.py --survey ps3pi_cfis --learning True --preprocess drop --algorithm RF --input params_ps3pi_cfis`
 
 The following command optimizes the RF hyperparameters using [HyperOpt](https://github.com/hyperopt/hyperopt) with a pre-defined parameter grid.
 
-`python photoz.py --survey ps3pi_cfis --optimize True --algorithm RF --input params_ps3pi_cfis`
+`python photoz.py --survey ps3pi_cfis --optimize HyperOpt --algorithm RF --input params_ps3pi_cfis`
 
 Both commands output files in the output/unions/[figures, files] directories. See **Usage** for more details.
 
