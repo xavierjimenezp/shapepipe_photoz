@@ -1068,14 +1068,14 @@ class LearningAlgorithms(object):
                 for i in missing_data.index:
                     df[i] = df[i].fillna(method)
             else:
-                print("Error: preprocess method is not defined. Possible values include 'drop', 'mode', 'mean', 'median' or int/float")
+                raise SyntaxError("preprocess method is not defined. Possible values include 'drop', 'mode', 'mean', 'median' or int/float")
 
         missing_data = self.missing_data(df)
         if missing_data.empty == True:
             df.to_csv(self.output_path + 'files/' + self.output_name + '_preprocessed.csv', index=False)
             return df
         else:
-            print('Error: Dataframe contains NaNs, preprocess function could not handle them.')
+            raise ValueError('Dataframe contains NaNs, preprocess function could not handle them.')
 
         return df
 
