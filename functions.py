@@ -829,7 +829,14 @@ class MakeCatalogs(object):
     def compute_weights(self, df_matched, column='MAG_AUTO_R'):
         df_unmatched = pd.read_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name + '_unmatched' + '.csv')
         n = len(df_matched)//10
-        hist, bins_edge = np.histogram(df_unmatched[column].values, bins=n, density=True)
+
+
+        udensity, ubins_edge = np.histogram(df_unmatched[column].values, bins=n, density=True)
+        ubin_min = ubins_edge[0]
+        ubin_max = ubins_edge[-1]
+        ustep = (ubin_max - ubin_min)/n
+
+        density, bins_edge = np.histogram(df_matched[column].values, bins=n, density=True)
         bin_min = bins_edge[0]
         bin_max = bins_edge[-1]
         step = (bin_max - bin_min)/n
@@ -838,26 +845,38 @@ class MakeCatalogs(object):
         df_matched.insert(loc=0, value=ID, column='ID')
         df_matched.sort_values(by=column, inplace=True)
 
-        weights = []
+        weights, uweights = [], []
         n_min = 0
+        n_umin = 0
         for i in range(len(df_matched)):
             for k in range(n_min, n):
-                if bin_min+step*(k+1) <= df_matched[column].values[i]:
+                if bin_min+step*(k+1) < df_matched[column].values[i]:
                     continue
                 else:
-                    weights.append(hist[k])
+                    weights.append(density[k])
                     n_min = k
                     break 
-            
+                
 
-        df_matched['weights'] = weights/np.sum(weights)
+            for k in range(n_umin, n):
+                if ubin_min+ustep*(k+1) < df_matched[column].values[i]:
+                    continue
+                else:
+                    uweights.append(udensity[k])
+                    n_umin = k
+                    break 
+                
+
+        w = np.array(uweights) / np.array(weights)
+
+        df_matched['weights'] = w
         df_matched.sort_values(by='ID', inplace=True)
-        weights = df_matched['weights'].to_numpy()
+        w = df_matched['weights'].to_numpy()
         df_matched.drop(columns=['weights', 'ID'], inplace=True)
 
-        np.save(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + 'Weights_' + self.output_name, weights)
+        np.save(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + 'Weights_' + self.output_name, w)
 
-        return weights
+        return w
 
 
 
