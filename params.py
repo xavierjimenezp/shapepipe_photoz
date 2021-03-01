@@ -29,23 +29,18 @@ temp_path = '/n17data/jimenez/temp/'
 spectral_path = '/n17data/jimenez/spectral_catalogs/'
 spectral_names = ['alldeep.egs.uniq.2012jun13']
 path_to_tile_run = '/n17data/jimenez/shaperun/'
-<<<<<<< HEAD
 input_path = None
-spectral_surveys = ['deep23']
-=======
-input_path = False
 spectral_surveys = ['unmatched_deep23']
->>>>>>> fb9442cd3319b7aad330ab8dbd283d1c99dbfaca
 vignet = False
 
 #------------------------------------------------------------------#
 # # # # # MACHINE LEARNING PARAMS # # # # #
 #------------------------------------------------------------------#
 
-max_evals = 200
+max_evals = 50
 path_to_csv = None
 #weights = path + 'output/ps3pi_cfis/files/' + 'Weights_' + output_name + '.npy'
-weights = None
+weights = True
 cv = 4
 #path_to_csv = path + 'catalogs/' + 'MediumDeep_CFHT_CFIS_R_matched_catalog_2' + '.csv'
 

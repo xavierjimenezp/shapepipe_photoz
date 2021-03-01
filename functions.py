@@ -16,6 +16,7 @@ import numpy as np
 import os
 import shutil
 import glob
+from numpy.compat.py3k import contextlib_nullcontext
 import pandas as pd
 import importlib
 import matplotlib.pyplot as plt
@@ -205,8 +206,8 @@ class GeneratePlots(object):
             self.output_path = output_path
         self.figure_path = self.output_path + 'output/' + self.survey + '/' + self.output_name + '/figures/'
 
-        self.df_matched = pd.read_csv(self.output_path + 'output/' + self.survey + '/files/' + self.output_name + '/' + self.output_name + '.csv')
-        self.df_unmatched = pd.read_csv(self.output_path + 'output/' + self.survey + '/files/' + self.output_name + '/' + self.output_name + '_unmatched'+'.csv')
+        self.df_matched = pd.read_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/'  + self.output_name + '.csv')
+        self.df_unmatched = pd.read_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name + '_unmatched'+'.csv')
         # self.df_d2d = pd.read_csv(self.output_path + 'output/' + self.survey + '/files/' + self.output_name +'_d2d'+'.csv')
 
 
@@ -883,7 +884,7 @@ class MakeCatalogs(object):
 
 class LearningAlgorithms(object):
 
-    def __init__(self, survey, bands, output_name, output_path=None, path_to_csv=None, dataframe=pd.DataFrame(data={}), sample_weight=None, validation_set=False, cv=4, n_jobs=-1):
+    def __init__(self, survey, bands, output_name, output_path=None, path_to_csv=None, dataframe=pd.DataFrame(data={}), sample_weight=None, validation_set=False, cv=4, preprocessing='drop', n_jobs=-1):
         """[summary]
 
         Args:
@@ -896,6 +897,7 @@ class LearningAlgorithms(object):
         self.survey = survey
         self._bands = bands
         self.output_name = output_name
+        self.preprocessing = preprocessing
         if path_to_csv is None:
             if dataframe.empty == True:
                 raise TypeError('dataframe must be specified if path_to_csv=None')
@@ -917,7 +919,7 @@ class LearningAlgorithms(object):
             self.train, self.test = train_test_split(self.df, test_size = 0.2, random_state=0)
             self.sample_weight_train = None
         else:
-            self.train, self.test, self.sample_weight_train, _ = train_test_split(self.df, self.sample_weight, test_size = 0.2, random_state=0)
+            self.train, self.test, self.sample_weight_train, self.sample_weight_test = train_test_split(self.df, self.sample_weight, test_size = 0.2, random_state=0)
 
         self.X_train = self.train.iloc[:,:-1]
         self.y_train = self.train.iloc[:,-1]
@@ -929,7 +931,7 @@ class LearningAlgorithms(object):
                 self.X_train, self.X_val, self.y_train, self.y_val = train_test_split(self.X_train, self.y_train, test_size=0.2, random_state=0)
                 self.sample_weight_train = None
             else:
-                self.X_train, self.X_val, self.y_train, self.y_val, self.sample_weight_train, _ = train_test_split(self.X_train, self.y_train, self.sample_weight, test_size=0.2, random_state=0)
+                self.X_train, self.X_val, self.y_train, self.y_val, self.sample_weight_train, self.sample_weight_test = train_test_split(self.X_train, self.y_train, self.sample_weight, test_size=0.2, random_state=0)
 
 
     def data(self):
@@ -1056,49 +1058,6 @@ class LearningAlgorithms(object):
         df.drop(columns=['gal_g1', 'gal_g2'], inplace=True)
         return df
 
-        
-
-    def preprocess(self, df, method='drop'):
-        if method is None:
-            return df
-        else:
-            df = df.replace([-1, -10, -99], np.nan)
-            missing_data = self.missing_data(df)
-            for i in range(len(missing_data)):
-                if missing_data['Missing Ratio'][i] > 15:
-                    df.drop(columns=[missing_data.index[i]], inplace=True)
-            if type(method) == str:
-                if method == 'drop':
-                    df = df.dropna(how='any')
-                elif method == 'mode':
-                    missing_data = self.missing_data(df)
-                    for i in missing_data.index:
-                        df[i] = df[i].fillna(df[i].mode()[0])
-                elif method == 'mean':
-                    missing_data = self.missing_data(df)
-                    for i in missing_data.index:
-                        df[i] = df[i].fillna(df[i].mean())
-                elif method == 'median':
-                    missing_data = self.missing_data(df)
-                    for i in missing_data.index:
-                        df[i] = df[i].fillna(df[i].median())
-            elif type(method) == int or type(method) == float:
-                missing_data = self.missing_data(df)
-                for i in missing_data.index:
-                    df[i] = df[i].fillna(method)
-            else:
-                raise SyntaxError("preprocess method is not defined. Possible values include 'drop', 'mode', 'mean', 'median' or int/float")
-
-        missing_data = self.missing_data(df)
-        if missing_data.empty == True:
-            df.to_csv(self.output_path + 'files/' + self.output_name + '_preprocessed.csv', index=False)
-            return df
-        else:
-            raise ValueError('Dataframe contains NaNs, preprocess function could not handle them.')
-
-        return df
-
-
 
     def sigma_eta(self, y_test, y_pred):
         delta_z = (y_test - y_pred)/(np.ones_like(y_test) + y_test)
@@ -1115,24 +1074,30 @@ class LearningAlgorithms(object):
         return missing_data
 
 
-    def plot_corrmat(self, df=pd.DataFrame(data={})):
+    def plot_corrmat(self, df=pd.DataFrame(data={}), figure_name=None):
         if df.empty == True:
             corrmat = self.df.corr()
             plt.subplots(figsize=(12,9))
             sns.heatmap(corrmat, vmax=1,cbar=True, annot=True, square=True, fmt='.2f', annot_kws={'size': 12})
-            plt.savefig(self.output_path + 'figures/'  + self.output_name + '_corrmat' + '.pdf', bbox_inches='tight', transparent=True)
+            if figure_name is None:
+                plt.savefig(self.output_path + 'figures/'  + self.output_name + '_corrmat' + '.pdf', bbox_inches='tight', transparent=True)
+            else:
+                plt.savefig(self.output_path + 'figures/'  + figure_name + '.pdf', bbox_inches='tight', transparent=True)
             plt.show()
             plt.close()
         elif df.empty == False:
             corrmat = df.corr()
             plt.subplots(figsize=(12,9))
             sns.heatmap(corrmat, vmax=1,cbar=True, annot=True, square=True, fmt='.2f', annot_kws={'size': 12})
-            plt.savefig(self.output_path + 'figures/'  + self.output_name + '_corrmat' + '.pdf', bbox_inches='tight', transparent=True)
+            if figure_name is None:
+                plt.savefig(self.output_path + 'figures/'  + self.output_name + '_corrmat' + '.pdf', bbox_inches='tight', transparent=True)
+            else:
+                plt.savefig(self.output_path + 'figures/'  + figure_name + '.pdf', bbox_inches='tight', transparent=True)
             plt.show()
             plt.close()           
 
 
-    def plot_zphot_zspec(self, y_pred, method, lim):
+    def plot_zphot_zspec(self, y_pred, y_test, method, lim):
         fig = plt.figure(figsize=(7,6), tight_layout=False)
         ax = fig.add_subplot(111)
         ax.set_facecolor('white')
@@ -1141,12 +1106,12 @@ class LearningAlgorithms(object):
         ax.set_ylabel(r'photometric redshift prediction', fontsize=20)
 
         ax.set_title('Photometric vs spectral redshift (%s)'%method, fontsize=20)
-        im = ax.hist2d([float(y) for y in self.y_test], [float(y) for y in y_pred], bins=(50, 50), cmap='Blues')
+        im = ax.hist2d([float(y) for y in y_test], [float(y) for y in y_pred], bins=(50, 50), cmap='Blues')
         ax.set_xlim([0, lim])
         ax.set_ylim([0, lim])
         cbar = fig.colorbar(im[3])
 
-        sigma, eta = self.sigma_eta(self.y_test, y_pred)
+        sigma, eta = self.sigma_eta(y_test, y_pred)
 
         ax.text(0.1,lim-0.2,r'$\sigma = {:.3f}$'.format(sigma)+'\n'+r'$\eta = {:.2f}$ %'.format(eta*100), size=15,va="baseline", ha="left", multialignment="left")
 
@@ -1157,6 +1122,7 @@ class LearningAlgorithms(object):
         plt.close()
 
     def sigma_eta_score(self, y_test, y_pred):
+        y_pred = y_pred.flatten()
         delta_z = (y_test - y_pred)/(np.ones_like(y_test) + y_test)
         sigma = 1.4826*np.median( np.abs( delta_z - np.median(delta_z) ) )
         outlier = np.abs(delta_z) > 0.15
@@ -1165,7 +1131,7 @@ class LearningAlgorithms(object):
 
 
 
-    def permutation_importance(self, model, params, scaler=False, linear=False, ann=False):
+    def permutation_importance(self, model, params={}, scaler=False, linear=False, ann=False):
 
         dataframe = self.df
         columns = dataframe.columns
@@ -1182,6 +1148,58 @@ class LearningAlgorithms(object):
 
         print(df.head(10))
         
+        
+ 
+    def permutation(self, lst): 
+        """Python function to make permutations of a given list
+
+        Args:
+            lst (list): [description]
+
+        Returns:
+            list: [description]
+        """
+        # If lst is empty then there are no permutations 
+        if len(lst) == 0: 
+            return [] 
+    
+        # If there is only one element in lst then, only 
+        # one permuatation is possible 
+        if len(lst) == 1: 
+            return [lst] 
+    
+        # Find the permutations for lst if there are 
+        # more than 1 characters 
+    
+        l = [] # empty list that will store current permutation 
+    
+        # Iterate the input(lst) and calculate the permutation 
+        for i in range(len(lst)): 
+            m = lst[i] 
+    
+            # Extract lst[i] or m from the list.  remLst is 
+            # remaining list 
+            remLst = lst[:i] + lst[i+1:] 
+        
+            # Generating all permutations where m is first 
+            # element 
+            for p in self.permutation(remLst): 
+                l.append([m] + p) 
+        return l 
+
+        
+    def feature_engineering(self, df, bands):
+        df_list = [df]
+        columns = list(df.columns)[1:len(bands)]
+        index_dict = dict(zip(bands, np.arange(len(bands))))
+        for p in self.permutation(bands): 
+            df_copy = df.copy()
+            for i in range(len(bands)-1):
+                df_copy.insert(loc = i+1, column = p[i]+'-'+p[i+1], value = df_copy.iloc[:,index_dict[p[i]]] - df_copy.iloc[:,index_dict[p[i+1]]]) 
+            df_copy.drop(columns=columns, inplace=True)
+            df_list.append(df_copy)
+        return df_list
+
 
 
     def cross_validation(self, model, params={}, metric=False, scaler=False, linear=False, ann=False, dataframe=pd.DataFrame(data={})):
@@ -1226,6 +1244,7 @@ class LearningAlgorithms(object):
 
             X_test = df_X_list[i]
             y_test = df_y_list[i]
+
             X_train = pd.concat(np.array([(j,X) for (j,X) in enumerate(df_X_list) if i != j])[:,1])
             y_train = pd.concat(np.array([(j,y) for (j,y) in enumerate(df_y_list) if i != j])[:,1])
             if self.sample_weight is not None:
@@ -1233,11 +1252,26 @@ class LearningAlgorithms(object):
             elif self.sample_weight is None:
                 weight_train = None
 
+            test = pd.concat((X_test, y_test), axis=1)
+            train = pd.concat((X_train, y_train), axis=1)
+            if ann == True:
+                regressor = model
+                train, test, weight_train, best_preprocess = self.preprocess(regressor, train, test, weight_train, method=self.preprocessing, scaler=scaler, linear=linear, ann=ann)
+            else:
+                if linear == True:
+                    regressor = make_pipeline(RobustScaler(), model(**params))
+                    train, test, weight_train, best_preprocess = self.preprocess(regressor, train, test, weight_train, method=self.preprocessing, scaler=scaler, linear=linear)
+                elif linear == False:
+                    regressor = model(**params)
+                    train, test, weight_train, best_preprocess = self.preprocess(regressor, train, test, weight_train, method=self.preprocessing, scaler=scaler, linear=linear)
+
+            X_train, X_test = train.iloc[:,:-1], test.iloc[:,:-1]
+            y_train, y_test = train.iloc[:,-1], test.iloc[:,-1]
+
             if scaler == True:
                 sc_X = StandardScaler()
                 X_train = sc_X.fit_transform(X_train)
                 X_test = sc_X.transform(X_test)
-
             if ann == True:
                 regressor = model
                 regressor.fit(X_train, y_train, batch_size = 32, epochs = 100, verbose=0, sample_weight=weight_train)
@@ -1249,6 +1283,7 @@ class LearningAlgorithms(object):
                 elif linear == False:
                     regressor = model(**params)
                     regressor.fit(X_train, y_train, sample_weight=weight_train)
+
             y_pred = regressor.predict(X_test)
             if metric == False:
                 sigma, eta = self.sigma_eta(y_test, y_pred.flatten())
@@ -1257,29 +1292,197 @@ class LearningAlgorithms(object):
             else:
                 score_list.append(metric(y_test, y_pred.flatten())) 
         if metric == False:
-            return np.mean(sigma_list), np.std(sigma_list), np.mean(eta_list), np.std(eta_list)
+            return np.mean(sigma_list), np.std(sigma_list), np.mean(eta_list), np.std(eta_list), best_preprocess
         else: 
             return np.mean(score_list), np.std(score_list)
 
-    def model(self, regressor, scaler=False, linear=False):
+
+
+    def preprocess(self, regressor, train, test, weight_train=None, weight_test=None, method='drop', scaler=False, linear=False, ann=False):
+        if method is None:
+            return train, test, weight_train
+        else:
+            if type(method) == str and method == 'BEST':
+                train, test, weight_train, best_method = self.best_missing(regressor, train, test, weight_train, scaler=scaler, linear=linear, ann=ann)
+                train['weight'] = weight_train
+                train_test = [train, test]
+            else:
+                
+                if weight_train is not None:
+                    train['weight'] = weight_train
+
+                train_test = []
+                for df in [train, test]:
+                    df = df.replace([-1, -10, -99], np.nan)
+                    missing_data = self.missing_data(df)
+                    for i in range(len(missing_data)):
+                        if missing_data['Missing Ratio'][i] > 15:
+                            df.drop(columns=[missing_data.index[i]], inplace=True)
+                    if type(method) == str:
+                        if method == 'drop':
+                            df = df.dropna(how='any')
+                        elif method == 'mode':
+                            missing_data = self.missing_data(df)
+                            for i in missing_data.index:
+                                df[i] = df[i].fillna(df[i].mode()[0])
+                        elif method == 'mean':
+                            missing_data = self.missing_data(df)
+                            for i in missing_data.index:
+                                df[i] = df[i].fillna(df[i].mean())
+                        elif method == 'median':
+                            missing_data = self.missing_data(df)
+                            for i in missing_data.index:
+                                df[i] = df[i].fillna(df[i].median())
+                        else:
+                            raise SyntaxError("preprocess method is not defined. Possible values include 'drop', 'mode', 'mean', 'median' or int/float")
+                    elif type(method) == int or type(method) == float:
+                        missing_data = self.missing_data(df)
+                        for i in missing_data.index:
+                            df[i] = df[i].fillna(method)
+                    else:
+                        raise SyntaxError("preprocess method is not defined. Possible values include 'drop', 'mode', 'mean', 'median' or int/float")
+                    train_test.append(df)
+
+            train, test = train_test[0], train_test[1]
+            if weight_train is not None:
+                weight_train = train['weight'].to_numpy()
+                train.drop(columns=['weight'], inplace=True)
+
+            df = pd.concat((train, test), axis=0)
+            missing_data = self.missing_data(df)
+            if missing_data.empty == True:
+                df.to_csv(self.output_path + 'files/' + self.output_name + '_preprocessed.csv', index=False)
+                if type(method) == str and method == 'BEST':
+                    return train, test, weight_train, best_method
+                else:
+                    return train, test, weight_train, method
+            else:
+                print(missing_data.head(10))
+                raise ValueError('Dataframe contains NaNs, preprocess function could not handle them.')
+
+
+    def best_missing(self, regressor, train, test, weight_train, scaler=False, linear=False, ann=False):        
+        score_list = []
+        df_list = []
+        methods = ['drop', 'mean', 'mode', 'median']
+        sample_weight_train = weight_train.copy()
+        for method in methods:
+            train_test = []
+            if method == 'drop':
+                # print('->'+method)
+                for i,df in enumerate([train, test]):
+                    if i == 0:
+                        df['weight'] = weight_train
+                        df = df.dropna(how='any')
+                        weight_train = df['weight']
+                    else:
+                        df = df.dropna(how='any')
+                    train_test.append(df)
+                # print(train_test[0].head(1))
+                train_test[0].drop(columns=['weight'], inplace=True)
+                _, y_pred, y_test = self.pmodel(regressor, train=train_test[0], test=train_test[1], weight_train=weight_train, scaler=scaler, linear=linear, ann=ann, preprocess_method='BEST')
+                score_list.append(self.sigma_eta_score(y_test, y_pred))
+            
+            elif method == 'mean':
+                # print('->'+method)
+                for df in [train, test]:
+                    missing_data = self.missing_data(df)
+                    for i in missing_data.index:
+                        df[i] = df[i].fillna(df[i].mean())
+                    train_test.append(df)
+                # print(train_test[0].head(1))
+                train_test[0].drop(columns=['weight'], inplace=True)
+                _, y_pred, y_test = self.pmodel(regressor, train=train_test[0], test=train_test[1], weight_train=sample_weight_train, scaler=scaler, linear=linear, ann=ann, preprocess_method='BEST')
+                score_list.append(self.sigma_eta_score(y_test, y_pred))
+
+            elif method == 'mode':
+                # print('->'+method)
+                for df in [train, test]:
+                    missing_data = self.missing_data(df)
+                    for i in missing_data.index:
+                        df[i] = df[i].fillna(df[i].mode()[0])
+                    train_test.append(df)
+                # print(train_test[0].head(1))
+                _, y_pred, y_test = self.pmodel(regressor, train=train_test[0], test=train_test[1], weight_train=sample_weight_train, scaler=scaler, linear=linear, ann=ann, preprocess_method='BEST')
+                score_list.append(self.sigma_eta_score(y_test, y_pred))
+
+            elif method == 'median':
+                # print('->'+method)
+                for df in [train, test]:
+                    missing_data = self.missing_data(df)
+                    for i in missing_data.index:
+                        df[i] = df[i].fillna(df[i].median())
+                    train_test.append(df)
+                # print(train_test[0].head(1))
+                _, y_pred, y_test = self.pmodel(regressor, train=train_test[0], test=train_test[1], weight_train=sample_weight_train, scaler=scaler, linear=linear, ann=ann, preprocess_method='BEST')
+                score_list.append(self.sigma_eta_score(y_test, y_pred))
+            df_list.append(train_test)
+        
+        best_index = np.argmin(np.array(score_list))
+        best_method = methods[best_index]
+        best_train_test = df_list[best_index]
+
+        if best_method == 'drop':
+            w = weight_train
+        else:
+            w = sample_weight_train
+
+        return best_train_test[0], best_train_test[1], w, best_method
+                
+
+
+
+    def pmodel(self, regressor, train=None, test=None, weight_train=None, scaler=False, linear=False, ann=False, preprocess_method=None):
+
+        if test is None and train is None:
+            test = pd.concat((self.X_test, self.y_test), axis=1)
+            train = pd.concat((self.X_train, self.y_train), axis=1)
+        elif test is not None and train is None:           
+            raise ValueError('test and train are either both None or both a dataframe') 
+        elif test is None and train is not None:
+            raise ValueError('test and train are either both None or both a dataframe')
+
+        if weight_train is None:
+            sample_weight_train = self.sample_weight_train
+        elif weight_train is not None:
+            sample_weight_train = weight_train
+            try:
+                train.drop(columns=['weight'], inplace=True)
+            except:
+                pass
+
+        if preprocess_method == 'BEST':
+            pass
+        # elif preprocess_method is not None and preprocess_method != 'BEST':
+        else:
+            if weight_train is None:
+                train, test, sample_weight_train, best_method = self.preprocess(regressor, train, test, self.sample_weight_train, method=self.preprocessing)
+            elif weight_train is not None:
+                train, test, sample_weight_train, best_method = self.preprocess(regressor, train, test, weight_train, method=self.preprocessing)
+
+
+        X_train, X_test = train.iloc[:,:-1], test.iloc[:,:-1]
+        y_train, y_test = train.iloc[:,-1], test.iloc[:,-1]
+
         if linear == True:
-            kwargs = {regressor.steps[-1][0] + '__sample_weight': self.sample_weight_train}
-            regressor.fit(self.X_train, self.y_train, **kwargs)
-            y_pred = regressor.predict(self.X_test)
+            kwargs = {regressor.steps[-1][0] + '__sample_weight': sample_weight_train}
+            regressor.fit(X_train, y_train, **kwargs)
+            y_pred = regressor.predict(X_test)
         else:
             if scaler == False:
-                regressor.fit(self.X_train, self.y_train, sample_weight=self.sample_weight_train)
-                y_pred = regressor.predict(self.X_test)
+                regressor.fit(X_train, y_train, sample_weight=sample_weight_train)
+                y_pred = regressor.predict(X_test)
             if scaler == True:
                 sc_X = StandardScaler()
-                X_train = sc_X.fit_transform(self.X_train)
-                X_test = sc_X.transform(self.X_test)
-                regressor.fit(X_train, self.y_train, sample_weight=self.sample_weight_train)
+                X_train = sc_X.fit_transform(X_train)
+                X_test = sc_X.transform(X_test)
+                if ann == True:
+                    regressor.fit(X_train, y_train, batch_size = 32, epochs = 100, verbose=0, sample_weight=sample_weight_train)
+                else:
+                    regressor.fit(X_train, y_train, sample_weight=sample_weight_train)
                 y_pred = regressor.predict(X_test)
 
-        y_test = self.y_test
-
-        df = pd.DataFrame(data={'y_pred': y_pred, 'y_test': y_test})
+        df = pd.DataFrame(data={'y_pred': y_pred.flatten(), 'y_test': y_test})
         df.to_csv(self.output_path + 'files/ML/' + self.method + '_prediction_' + self.output_name + '.csv', index = False)
 
         return regressor, y_pred, y_test
@@ -1287,8 +1490,8 @@ class LearningAlgorithms(object):
 
 class RandomForest(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
-        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, preprocessing=preprocessing, n_jobs=n_jobs)
         self.method = 'RF'
         self.params = {'n_estimators': 86, 'max_depth': 11, 'n_jobs':-1}
 
@@ -1301,7 +1504,7 @@ class RandomForest(LearningAlgorithms):
         """
         regressor = RandomForestRegressor(**self.params)
 
-        return LearningAlgorithms.model(self, regressor)
+        return LearningAlgorithms.pmodel(self, regressor)
 
 
     def score(self):
@@ -1317,8 +1520,9 @@ class RandomForest(LearningAlgorithms):
 
 
     def plot(self, lim):
-        _, y_pred, _ = self.model()
-        LearningAlgorithms.plot_zphot_zspec(self, y_pred, self.method, lim)
+        _, y_pred, y_test = self.model()
+        LearningAlgorithms.plot_zphot_zspec(self, y_pred, y_test, self.method, lim)
+
 
     def permutation(self):
         LearningAlgorithms.permutation_importance(self,  model=RandomForestRegressor, params=self.params, scaler=False, linear=False, ann=False)
@@ -1327,8 +1531,8 @@ class RandomForest(LearningAlgorithms):
 
 class SupportVectorRegression(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
-        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, preprocessing=preprocessing, n_jobs=n_jobs)
         self.method = 'SVR'
         self.params = {'C':1.0, 'cache_size':200, 'coef0':0.0, 'epsilon':0.1, 'gamma':'scale', 'kernel':'rbf', 'max_iter':-1, 'shrinking':True, 'tol':0.001}
 
@@ -1336,7 +1540,7 @@ class SupportVectorRegression(LearningAlgorithms):
     def model(self):
         regressor = SVR(**self.params)
 
-        return LearningAlgorithms.model(self, regressor, scaler=True)
+        return LearningAlgorithms.pmodel(self, regressor, scaler=True)
 
 
     def score(self):
@@ -1352,8 +1556,8 @@ class SupportVectorRegression(LearningAlgorithms):
 
 
     def plot(self, lim):
-        _, y_pred, _ = self.model()
-        LearningAlgorithms.plot_zphot_zspec(self, y_pred, self.method, lim)
+        _, y_pred, y_test = self.model()
+        LearningAlgorithms.plot_zphot_zspec(self, y_pred, y_test, self.method, lim)
 
     def permutation(self):
         LearningAlgorithms.permutation_importance(self,  model=SVR, params=self.params, scaler=True, linear=False, ann=False)
@@ -1361,8 +1565,8 @@ class SupportVectorRegression(LearningAlgorithms):
 
 class LightGBM(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
-        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, preprocessing=preprocessing, n_jobs=n_jobs)
         self.method = 'LGB'
         self.params = {'objective':'regression','num_leaves':5,
                               'learning_rate':0.05, 'n_estimators':720,
@@ -1377,7 +1581,7 @@ class LightGBM(LearningAlgorithms):
         
         regressor = lgb.LGBMRegressor(**self.params)
 
-        return LearningAlgorithms.model(self, regressor, scaler=False)
+        return LearningAlgorithms.pmodel(self, regressor, scaler=False)
 
 
     def score(self):
@@ -1393,16 +1597,16 @@ class LightGBM(LearningAlgorithms):
 
 
     def plot(self, lim):
-        _, y_pred, _ = self.model()
-        LearningAlgorithms.plot_zphot_zspec(self, y_pred, self.method, lim)
+        _, y_pred, y_test = self.model()
+        LearningAlgorithms.plot_zphot_zspec(self, y_pred, y_test, self.method, lim)
 
     def permutation(self):
         LearningAlgorithms.permutation_importance(self,  model=lgb.LGBMRegressor, params=self.params, scaler=False, linear=False, ann=False)
 
 class XGBoost(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
-        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, preprocessing=preprocessing, n_jobs=n_jobs)
         self.method = 'XGB'
         self.params = {'max_depth':3, 'n_estimators':2200, 'random_state':0, 'nthread': -1, 'n_jobs':-1}
 
@@ -1410,7 +1614,7 @@ class XGBoost(LearningAlgorithms):
     def model(self):
 
         regressor = xgb.XGBRegressor(**self.params)
-        return LearningAlgorithms.model(self, regressor, scaler=False)
+        return LearningAlgorithms.pmodel(self, regressor, scaler=False)
 
 
     def score(self):
@@ -1426,8 +1630,8 @@ class XGBoost(LearningAlgorithms):
 
 
     def plot(self, lim):
-        regressor, y_pred, _ = self.model()
-        LearningAlgorithms.plot_zphot_zspec(self, y_pred, self.method, lim)
+        _, y_pred, y_test = self.model()
+        LearningAlgorithms.plot_zphot_zspec(self, y_pred, y_test, self.method, lim)
 
     def permutation(self):
         LearningAlgorithms.permutation_importance(self,  model=xgb.XGBRegressor, params=self.params, scaler=False, linear=False, ann=False)
@@ -1435,8 +1639,8 @@ class XGBoost(LearningAlgorithms):
 
 class GradientBoostingRegression(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
-        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, preprocessing=preprocessing, n_jobs=n_jobs)
         self.method = 'GBR'
         self.params = {'n_estimators':3000, 'learning_rate':0.05,
                                    'max_depth':4, 'max_features':'sqrt',
@@ -1447,7 +1651,7 @@ class GradientBoostingRegression(LearningAlgorithms):
 
         regressor = GradientBoostingRegressor(**self.params)
 
-        return LearningAlgorithms.model(self, regressor, scaler=False)
+        return LearningAlgorithms.pmodel(self, regressor, scaler=False)
 
 
     def score(self):
@@ -1463,8 +1667,8 @@ class GradientBoostingRegression(LearningAlgorithms):
 
 
     def plot(self, lim):
-        regressor, y_pred, _ = self.model()
-        LearningAlgorithms.plot_zphot_zspec(self, y_pred, self.method, lim)
+        _, y_pred, y_test = self.model()
+        LearningAlgorithms.plot_zphot_zspec(self, y_pred, y_test, self.method, lim)
 
     def permutation(self):
         LearningAlgorithms.permutation_importance(self,  model=GradientBoostingRegressor, params=self.params, scaler=False, linear=False, ann=False)
@@ -1472,8 +1676,8 @@ class GradientBoostingRegression(LearningAlgorithms):
 
 class KernelRidgeRegression(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
-        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, preprocessing=preprocessing, n_jobs=n_jobs)
         self.method = 'KRR'
         self.params = {'alpha':0.6, 'kernel':'polynomial', 'degree':2, 'coef0':2.5}
 
@@ -1482,7 +1686,7 @@ class KernelRidgeRegression(LearningAlgorithms):
 
         regressor = KernelRidge(**self.params)
 
-        return LearningAlgorithms.model(self, regressor, scaler=True)
+        return LearningAlgorithms.pmodel(self, regressor, scaler=True)
 
 
     def score(self):
@@ -1498,16 +1702,16 @@ class KernelRidgeRegression(LearningAlgorithms):
 
 
     def plot(self, lim):
-        regressor, y_pred, _ = self.model()
-        LearningAlgorithms.plot_zphot_zspec(self, y_pred, self.method, lim)
+        _, y_pred, y_test = self.model()
+        LearningAlgorithms.plot_zphot_zspec(self, y_pred, y_test, self.method, lim)
 
     def permutation(self):
         LearningAlgorithms.permutation_importance(self,  model=KernelRidge, params=self.params, scaler=True, linear=False, ann=False)
 
 class ElasticNetRegression(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
-        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, preprocessing=preprocessing, n_jobs=n_jobs)
         self.method = 'ENET'
         self.params={'alpha':0.0005, 'l1_ratio':.9, 'random_state':0}
 
@@ -1515,7 +1719,7 @@ class ElasticNetRegression(LearningAlgorithms):
     def model(self):
 
         regressor = make_pipeline(RobustScaler(), ElasticNet(**self.params))
-        return LearningAlgorithms.model(self, regressor, scaler=False, linear=True)
+        return LearningAlgorithms.pmodel(self, regressor, scaler=False, linear=True)
 
 
     def score(self):
@@ -1540,8 +1744,8 @@ class ElasticNetRegression(LearningAlgorithms):
 
 class LassoRegression(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
-        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, preprocessing=preprocessing, n_jobs=n_jobs)
         self.method = 'LASSO'
         self.params={'alpha': 0.0005, 'random_state':0}
 
@@ -1549,7 +1753,7 @@ class LassoRegression(LearningAlgorithms):
     def model(self):
 
         regressor = make_pipeline(RobustScaler(), Lasso(**self.params))
-        return LearningAlgorithms.model(self, regressor, scaler=False, linear=True)
+        return LearningAlgorithms.pmodel(self, regressor, scaler=False, linear=True)
 
 
     def score(self):
@@ -1565,8 +1769,8 @@ class LassoRegression(LearningAlgorithms):
 
 
     def plot(self, lim):
-        regressor, y_pred, _ = self.model()
-        LearningAlgorithms.plot_zphot_zspec(self, y_pred, self.method, lim)
+        _, y_pred, y_test = self.model()
+        LearningAlgorithms.plot_zphot_zspec(self, y_pred, y_test, self.method, lim)
 
     def permutation(self):
         LearningAlgorithms.permutation_importance(self,  model=Lasso, params=self.params, scaler=False, linear=True, ann=False)
@@ -1574,8 +1778,8 @@ class LassoRegression(LearningAlgorithms):
 
 class ArtificialNeuralNetwork(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
-        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, preprocessing=preprocessing, n_jobs=n_jobs)
         self.method = 'ANN'
 
     def ann(self):
@@ -1600,7 +1804,7 @@ class ArtificialNeuralNetwork(LearningAlgorithms):
 
         ann = self.ann()
         
-        ann.fit(X_train, self.y_train, batch_size = 32, epochs = 100, verbose=0, sample_weight=self.sample_weight_train)
+        ann.fit(X_train, self.y_train, batch_size = 32, epochs = 50, verbose=0, sample_weight=self.sample_weight_train)
         y_pred = ann.predict(X_test)
 
         y_test = self.y_test
@@ -1623,8 +1827,8 @@ class ArtificialNeuralNetwork(LearningAlgorithms):
 
 
     def plot(self, lim):
-        regressor, y_pred, _ = self.model()
-        LearningAlgorithms.plot_zphot_zspec(self, y_pred.flatten(), self.method, lim)
+        _, y_pred, y_test = self.model()
+        LearningAlgorithms.plot_zphot_zspec(self, y_pred.flatten(), y_test, self.method, lim)
 
     def permutation(self):
         LearningAlgorithms.permutation_importance(self, model=self.ann, linear=False, scaler=True, ann=True)
@@ -1632,8 +1836,8 @@ class ArtificialNeuralNetwork(LearningAlgorithms):
 
 class ConvolutionalNeuralNetwork(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
-        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, preprocessing=preprocessing, n_jobs=n_jobs)
         self.X = np.load(self.output_path + 'output/' + self.survey + '/files/' + output_name + '.npy')
         self.X_train, self.X_test = train_test_split(self.X, test_size = 0.2, random_state=0)
         self.X_train, self.X_val = train_test_split(self.X_train, test_size = 0.2, random_state=0)
@@ -1735,9 +1939,8 @@ class ConvolutionalNeuralNetwork(LearningAlgorithms):
 
 class Optimizer(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
-        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, n_jobs=n_jobs)
-
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, preprocessing=preprocessing, n_jobs=n_jobs)
     def sigma_eta_score(self, y_test, y_pred):
         delta_z = (y_test - y_pred)/(np.ones_like(y_test) + y_test)
         sigma = 1.4826*np.median( np.abs( delta_z - np.median(delta_z) ) )
@@ -1768,23 +1971,42 @@ class Optimizer(LearningAlgorithms):
                 df_X_list.append(self.X_train.iloc[i*int(n/self.cv):(i+1)*int(n/self.cv), :])
                 df_y_list.append(self.y_train.iloc[i*int(n/self.cv):(i+1)*int(n/self.cv)])
                 if self.sample_weight is not None:
-                    weight_list.append(self.sample_weight[i*int(n/self.self.cv):(i+1)*int(n/self.self.cv)])
+                    weight_list.append(self.sample_weight_train[i*int(n/self.cv):(i+1)*int(n/self.cv)])
             if i == self.cv-1:
                 df_X_list.append(self.X_train.iloc[i*int(n/self.cv):, :])
                 df_y_list.append(self.y_train.iloc[i*int(n/self.cv):])
                 if self.sample_weight is not None:
-                    weight_list.append(self.sample_weight[i*int(n/self.self.cv):])
-        
+                    weight_list.append(self.sample_weight_train[i*int(n/self.cv):])
+
         score_list = []
         for i in range(0,self.cv):
+
             X_test = df_X_list[i]
             y_test = df_y_list[i]
+
             X_train = pd.concat(np.array([(j,X) for (j,X) in enumerate(df_X_list) if i != j])[:,1])
             y_train = pd.concat(np.array([(j,y) for (j,y) in enumerate(df_y_list) if i != j])[:,1])
             if self.sample_weight is not None:
                 weight_train = np.concatenate(np.array([(j,w) for (j,w) in enumerate(weight_list) if i != j])[:,1])
             elif self.sample_weight is None:
                 weight_train = None
+
+            test = pd.concat((X_test, y_test), axis=1)
+            train = pd.concat((X_train, y_train), axis=1)
+            
+            if ann == True:
+                regressor = model
+                train, test, weight_train, _ = self.preprocess(regressor, train, test, weight_train, method=self.preprocessing, scaler=scaler, linear=linear)
+            else:
+                if linear == True:
+                    regressor = model = make_pipeline(RobustScaler(), model)
+                    train, test, weight_train, _ = self.preprocess(regressor, train, test, weight_train, method=self.preprocessing, scaler=scaler, linear=linear)
+                elif linear == False:
+                    regressor = model
+                    train, test, weight_train, _ = self.preprocess(regressor, train, test, weight_train, method=self.preprocessing, scaler=scaler, linear=linear)
+
+            X_train, X_test = train.iloc[:,:-1], test.iloc[:,:-1]
+            y_train, y_test = train.iloc[:,-1], test.iloc[:,-1]
 
             if scaler == True:
                 sc_X = StandardScaler()
@@ -1811,8 +2033,8 @@ class Optimizer(LearningAlgorithms):
 
 class RandomForestOptimizer(Optimizer):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
-        super().__init__(survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs)
         self.method = 'RF_Opt'
 
 
@@ -1880,7 +2102,7 @@ class RandomForestOptimizer(Optimizer):
         rf = RandomForestRegressor()
         # Random search of parameters, using 3 fold cross validation, 
         # search across 100 different combinations, and use all available cores
-        rf_grid = GridSearchCV(estimator = rf, param_grid = grid, scoring=score, cv = self.cv, verbose=2, n_jobs = -1)
+        rf_grid = GridSearchCV(estimator = rf, param_grid = grid, scoring=score, cv = self.cv, verbose=0, n_jobs = self.nodes)
         # Fit the random search model
         rf_grid.fit(self.X_train, self.y_train)
 
@@ -1919,7 +2141,7 @@ class RandomForestOptimizer(Optimizer):
         rf = RandomForestRegressor()
         # Random search of parameters, using 3 fold cross validation, 
         # search across 100 different combinations, and use all available cores
-        rf_random = RandomizedSearchCV(estimator = rf, param_distributions = random_grid, scoring=score, n_iter = max_evals, cv = self.cv, verbose=2, random_state=0, n_jobs = -1)
+        rf_random = RandomizedSearchCV(estimator = rf, param_distributions = random_grid, scoring=score, n_iter = max_evals, cv = self.cv, verbose=0, random_state=0, n_jobs = self.nodes)
         # Fit the random search model
         rf_random.fit(self.X_train, self.y_train)
 
@@ -1936,10 +2158,10 @@ class RandomForestOptimizer(Optimizer):
             best = self.random_search(max_evals)
         elif method == 'GridSearch':
             best = self.grid_search()
-        _, y_pred, y_test = LearningAlgorithms.model(self, regressor=RandomForestRegressor(**best), scaler=True)
+        _, y_pred, y_test = LearningAlgorithms.pmodel(self, regressor=RandomForestRegressor(**best), scaler=True)
         eta, sigma = LearningAlgorithms.sigma_eta(self, y_test, y_pred)
 
-        LearningAlgorithms.plot_zphot_zspec(self, y_pred.flatten(), self.method+'_'+method, lim=1.8)
+        LearningAlgorithms.plot_zphot_zspec(self, y_pred.flatten(), y_test, self.method+'_'+method, lim=1.8)
 
         return y_pred, eta, sigma
 
@@ -1947,8 +2169,8 @@ class RandomForestOptimizer(Optimizer):
 
 class SVROptimizer(Optimizer):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
-        super().__init__(survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs)
         self.method = 'SVR_Opt'
 
     def objective(self, params):
@@ -1956,6 +2178,7 @@ class SVROptimizer(Optimizer):
         gam = params['gamma']
         cc = params['C']
         params = {'kernel':'rbf', 'gamma':gam, 'C':cc}
+
 
         # model = SVR(**params)
         # model.fit(self.X_train,self.y_train)
@@ -1973,21 +2196,20 @@ class SVROptimizer(Optimizer):
         best=fmin(fn=self.objective,space=params,algo=tpe.suggest,trials=trial,max_evals=max_evals,rstate=np.random.RandomState(seed=2))
         return best
 
-    def best_params(self, max_evals=200):
+    def best_params(self, max_evals=200, method='HyperOpt'):
         trial = Trials()
         best = self.optimize(trial, max_evals)
-        _, y_pred, y_test = LearningAlgorithms.model(self, regressor=SVR(**best), scaler=True)
+        _, y_pred, y_test = LearningAlgorithms.pmodel(self, regressor=SVR(**best), scaler=True)
         eta, sigma = LearningAlgorithms.sigma_eta(self, y_test, y_pred)
 
-        LearningAlgorithms.plot_zphot_zspec(self, y_pred.flatten(), self.method, lim=1.8)
-
+        LearningAlgorithms.plot_zphot_zspec(self, y_pred.flatten(), y_test, self.method+'_'+method, lim=1.8)
         return y_pred, eta, sigma
 
 
 class XGBoostOptimizer(Optimizer):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
-        super().__init__(survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs)
         self.method = 'XGB_Opt'
     
     def objective(self, params):
@@ -2009,21 +2231,21 @@ class XGBoostOptimizer(Optimizer):
         best['max_depth'] = int(best['max_depth'])
         return best
 
-    def best_params(self, max_evals=200):
+    def best_params(self, max_evals=200, method='HyperOpt'):
         trial = Trials()
         best = self.optimize(trial, max_evals)
-        _, y_pred, y_test = LearningAlgorithms.model(self, regressor=XGBoost(**best))
+        _, y_pred, y_test = LearningAlgorithms.pmodel(self, regressor=XGBoost(**best))
         eta, sigma = LearningAlgorithms.sigma_eta(self, y_test, y_pred)
 
-        LearningAlgorithms.plot_zphot_zspec(self, y_pred.flatten(), self.method, lim=1.8)
+        LearningAlgorithms.plot_zphot_zspec(self, y_pred.flatten(), y_test, self.method+'_'+method, lim=1.8)
 
         return y_pred, eta, sigma
 
 
 class KRROptimizer(Optimizer):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
-        super().__init__(survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs)
         self.method = 'KRR_Opt'
 
     def objective(self, params):
@@ -2050,13 +2272,13 @@ class KRROptimizer(Optimizer):
         best=fmin(fn=self.objective,space=params,algo=tpe.suggest,trials=trial,max_evals=max_evals,rstate=np.random.RandomState(seed=2))
         return best
 
-    def best_params(self, max_evals=200):
+    def best_params(self, max_evals=200, method='HyperOpt'):
         trial = Trials()
         best = self.optimize(trial, max_evals)
-        _, y_pred, y_test = LearningAlgorithms.model(self, regressor=KernelRidge(**best), scaler=True)
+        _, y_pred, y_test = LearningAlgorithms.pmodel(self, regressor=KernelRidge(**best), scaler=True)
         eta, sigma = LearningAlgorithms.sigma_eta(self, y_test, y_pred)
 
-        LearningAlgorithms.plot_zphot_zspec(self, y_pred.flatten(), self.method, lim=1.8)
+        LearningAlgorithms.plot_zphot_zspec(self, y_pred.flatten(), y_test, self.method+'_'+method, lim=1.8)
 
         return y_pred, eta, sigma
 
@@ -2064,8 +2286,8 @@ class KRROptimizer(Optimizer):
 
 class ANNOptimizer(Optimizer):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs):
-        super().__init__(survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, n_jobs)
+    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs)
         self.method = 'ANN_Opt'
 
     # @staticmethod
@@ -2141,7 +2363,7 @@ class ANNOptimizer(Optimizer):
     #     return {'loss': err, 'status': STATUS_OK, 'model': model}
 
 
-    def best_params(self, max_evals = 200):
+    def best_params(self, max_evals = 200, method='HyperOpt'):
         from hyperas import optim
         from hyperas.distributions import choice, uniform
 
@@ -2152,7 +2374,7 @@ class ANNOptimizer(Optimizer):
         y_pred = best_model.predict(self.X_test, verbose = 0)
         eta, sigma = LearningAlgorithms.sigma_eta(self, self.y_test.values, y_pred)
 
-        LearningAlgorithms.plot_zphot_zspec(self, y_pred.flatten(), self.method, lim=1.8)
+        LearningAlgorithms.plot_zphot_zspec(self, y_pred.flatten(), y_test, self.method+'_'+method, lim=1.8)
 
         return y_pred, eta, sigma
 
