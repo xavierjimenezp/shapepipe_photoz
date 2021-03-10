@@ -20,7 +20,8 @@ path = os.getcwd() + '/'
 bands = ['R']
 output_path = path
 output_name = 'CFIS_matched_deep_2_3_catalog_R'
-temp_path = '/n17data/jimenez/temp/'
+#temp_path = '/n17data/jimenez/temp/'
+temp_path = path
 
 #------------------------------------------------------------------#
 # # # # # PREPROCESSING PARAMS # # # # #
@@ -37,11 +38,15 @@ vignet = False
 # # # # # MACHINE LEARNING PARAMS # # # # #
 #------------------------------------------------------------------#
 
-max_evals = 50
+max_evals = 100
 path_to_csv = None
 #weights = path + 'output/ps3pi_cfis/files/' + 'Weights_' + output_name + '.npy'
-weights = True
+weights = False
 cv = 4
+feature_engineering = False
+feature_importance = False
+plot = False
+morph_importance = True
 #path_to_csv = path + 'catalogs/' + 'MediumDeep_CFHT_CFIS_R_matched_catalog_2' + '.csv'
 
 
