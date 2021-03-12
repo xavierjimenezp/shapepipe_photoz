@@ -1162,7 +1162,7 @@ class LearningAlgorithms(object):
             df_shuffle = dataframe.copy()
             df_shuffle[column] = df_shuffle[column].sample(frac=1).values
             mscore, mstd = self.cross_validation(model=model, params=params, metric=self.sigma_eta_score, scaler=scaler, linear=linear, ann=ann, dataframe=df_shuffle)
-            df = pd.concat((df, pd.DataFrame(data={'Weight':['{:.3f}±{:.3f}'.format(mscore-score, np.abs(std+mstd))], 'Feature': [column], 'score':score-mscore})))
+            df = pd.concat((df, pd.DataFrame(data={'Weight':['${:.3f}\pm{:.3f}$'.format(mscore-score, np.abs(std+mstd))], 'Feature': ['$' + column + '$'], 'score':score-mscore})))
         df.sort_values(by=['score'], inplace=True)
         score_weight = df['score'].to_numpy()
         feature = df['Feature'].to_numpy()
