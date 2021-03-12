@@ -1,3 +1,4 @@
+
 # ShapePipe PhotoZ 
  [![python37](https://camo.githubusercontent.com/e770ba34ca059770c9cf01c46dd567c3e0574e99d8afaf8e6179e55f432129c7/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f707974686f6e2d332e372d79656c6c6f772e737667)](https://www.python.org/)
 
@@ -41,9 +42,9 @@ Tutorial to run a simple example.
 
 ## Preprocessing
 
-The following commands take a ShapePipe output tile catalog in 'example/ps3pi_cfis/tile/' and preprocess it into a .csv catalog. Redshift distribution plots are also generated and can be found in 'output/ps3pi_cfis/figures/'.
+The following commands takes the ShapePipe output tile catalogs in candide /n17data/ directory and preprocess it into a .csv catalog. Redshift distribution plots are also generated and can be found in 'output/ps3pi_cfis/[output_name]/figures/'.
 
-> **Note**: CFIS data is not public, please put your ShapePipe output catalog into 'example/ps3pi_cfis/tile/'.
+> **Note**: CFIS data is not public, please put your ShapePipe output catalog into 'example/ps3pi_cfis/tile/' if you don't have access to candide and change params_ps3pi_cfis.py config file.
 
 `python photoz.py --survey ps3pi_cfis --clean True --input params_ps3pi_cfis`
 
@@ -55,15 +56,11 @@ The following commands take a ShapePipe output tile catalog in 'example/ps3pi_cf
 
 ## Machine learning algorithms
 
-The following command runs the **random forest** (RF) algorithm with default hyperparameters through the catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv  catalog using the example/params_ps3pi_cfis.py config file.
+The following command runs the **random forest** (RF) algorithm with default hyperparameters through the catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv  catalog using the example/params_ps3pi_cfis.py config file. It hen optimizes the RF hyperparameters using [HyperOpt](https://github.com/hyperopt/hyperopt) with a pre-defined parameter grid.
 
-`python photoz.py --survey ps3pi_cfis --learning True --preprocess drop --algorithm RF --input params_ps3pi_cfis`
+`python photoz.py --survey ps3pi_cfis --learning True --preprocess drop --algorithm RF --optimize HyperOpt --input params_ps3pi_cfis`
 
-The following command optimizes the RF hyperparameters using [HyperOpt](https://github.com/hyperopt/hyperopt) with a pre-defined parameter grid.
-
-`python photoz.py --survey ps3pi_cfis --optimize HyperOpt --algorithm RF --input params_ps3pi_cfis`
-
-Both commands output files in the output/unions/[figures, files] directories. See **Usage** for more details.
+Output files are saved in output/ps3pi_cfis/[outpu_name]/[figures, files] directories. See **Usage** for more details.
 
 # Machine learning algorithms
 
@@ -116,7 +113,14 @@ Input parameters are found in `params.py`. The following parameters are required
 Input parameters are found in `params.py`. The following parameters are required for photometric redshift calculation:
 
  - `max_evals`: `(optinal, int)` number of evaluations for hyper parameter optimisation using `HyperOpt`. Defaults to 200.
- - `path_to_csv`: `(str)` path to pandas DataFrame (use pd.to_csv(path_to_csv, index=False) to create input catalog. Please name the spectral redshift column "Z_SPEC" and put it at the end. See /catalogs/MediumDeep_CFHT_CFIS_R_matched_catalog_2.csv for an example.
+ - `path_to_csv`: `(str)` path to pandas DataFrame (use pd.to_csv(path_to_csv, index=False) to create input catalog. Please name the spectral redshift column "Z_SPEC" and put it at the end. Defaults to None.
+ - `weights`: `(bool or str)` if True, weights will be computed using r band. If str, path for .npy file. If None, won't use weights for regression. Defaults to True.
+ - `cv`: `(int)` folds for cross-validation. Defaults to 10.
+ - `feature_engineering`: `(bool)` If True, will try all possible color combination while keeping the r band . Defaults to False.
+ - `feature_importance`: `(bool)`If True, will save a .csv file in LaTeX format with feature importance. Defaults to False.
+ - `plot`: `(bool)` If True, will plot the correlation matrix and z_phot vs z_spec estimation. Defaults to False,
+ - `morph_importance`: `(bool)` If True, will save a .csv filein LaTeX format with score values with and wthout morphological parameters for each possible band combination. Defaults to False.
+
 
 >**Note**: If the input DataFrame in `path_to_csv` containes NaNs they will be treated accordingly by the *preprocess* function. Please refrain from setting negative values (e.g. -1, -10, -99, etc) or any other kind of value instead of NaNs. Otherwise, the *preprocess* function will ignore them and the code will perform poorly.
 
@@ -138,7 +142,7 @@ The `photoz.py` python file takes the following arguments. The function can be e
 
 ### Machine learning
 
- - `--algorithm or -a`: `(optinal, str)` MLM algorithm (see **Terminology** for options). Use BEST if you want to try them all and output the best one. Defaults to SVR.
+ - `--algorithm or -a`: `(optinal, str)` MLM algorithm (see **Terminology** for options). Use BEST if you want to try them all and output the best one. Defaults to RF.
  - `--preprocess or -p`: `(optional, str, int or float)`: method to handle missing values. Columns with>15% missing values will be droped. If type(method)=str, methods include: 'drop', 'mode', 'mean', 'median'. if type(method)=int or float, missing values will be replaced by the selected value. Defaults to None.
     - drop: rows with missing values are droped
     - mode: missing values are replaced with column mode
@@ -148,17 +152,14 @@ The `photoz.py` python file takes the following arguments. The function can be e
  - `--optimize or -o`: `(optinal, str)` either 'HyperOpt', 'RandomSearch' or 'GridSearch'. Will use a predefined hyperparameter grid to optimize the MLM algorithm. For each method the grid is hard coded in Optimizer class and can be changed manually. This functionality may be very time expensive. Recommended value for max_evals in params.py is 200. Defaults to None.
 
 >**Note**: `--optimize` currently only supports :
-> - HyperOpt: RF, SVR, KRR and XGB (ANN is under development and the other MLM should be available soon) 
-> - RandomSearch: RF (other MLM should be available soon). 
-> - GridSearch: RF (other MLM should be available soon).
+> - HyperOpt: RF, SVR, KRR and XGB (ANN support is deprecated) 
+> - RandomSearch: RF (SVR support is deprecated). 
+> - GridSearch: RF (SVR support is deprecated).
 
 ## Output files
-WIP
 
-### Preprocessing
-
-### Machine learning
-
+Output files are saved in ouput/[survey]/[output_name]/[files or figures]
 
 ## Citation
-WIP
+
+Xavier Jiménez, Marin Kilbenger, Joana Frontera-Pons. Photometric redshifts for UNIONS, 2021 in prep.
