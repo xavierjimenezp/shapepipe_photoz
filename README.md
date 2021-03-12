@@ -22,6 +22,10 @@ Clone or download the PhotoZ repository:
 
 `git clone https://github.com/xavierjimenezp/shapepipe_photoz/`
 
+[Download](https://zenodo.org/record/4600830#.YEtHcnVKjJw) catalogs.zip and unzip 
+
+`unzip catalogs.zip`
+
 Create a new conda environment:
 
 `conda env create -f environment_photoz.yml`
