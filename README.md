@@ -5,7 +5,7 @@
 
 |Version         |Date                          |
 |----------------|-------------------------------|
-|alpha|12/03/2021            |
+|alpha|10/03/2021            |
 
 
 [ShapePipe](https://github.com/CosmoStat/shapepipe) extension to preprocess individual tile output catalogs and compute photometric redshifts with different machine learning methods.
@@ -21,6 +21,10 @@ PhotoZ is currentlty under early development and may contain bugs or instabiliti
 Clone or download the PhotoZ repository:
 
 `git clone https://github.com/xavierjimenezp/shapepipe_photoz/`
+
+[Download](https://zenodo.org/record/4600830#.YEtHcnVKjJw) catalogs.zip and unzip 
+
+`unzip catalogs.zip`
 
 Create a new conda environment:
 
