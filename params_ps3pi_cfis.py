@@ -26,11 +26,11 @@ temp_path = '/n17data/jimenez/temp/'
 # # # # # PREPROCESSING PARAMS # # # # #
 #------------------------------------------------------------------#
 
-spectral_path = path + 'catalogs/'
+spectral_path = '/n17data/jimenez/spectral_catalogs/'
 spectral_names = ['alldeep.egs.uniq.2012jun13']
-path_to_tile_run = False
-input_path = 'example/ps3pi_cfis/tiles/'
-spectral_surveys = ['deep23']
+path_to_tile_run = '/n17data/jimenez/shaperun/'
+input_path = None
+spectral_surveys = ['unmatched_deep23']
 vignet = False
 
 #------------------------------------------------------------------#
@@ -39,6 +39,11 @@ vignet = False
 
 max_evals = 200
 path_to_csv = path + 'catalogs/' + 'MediumDeep_CFHT_CFIS_R_matched_catalog_2' + '.csv'
-
+weights = True
+cv = 10
+feature_engineering = False
+feature_importance = False
+plot = False
+morph_importance = False
 
 

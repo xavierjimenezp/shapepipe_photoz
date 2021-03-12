@@ -40,8 +40,8 @@ if __name__ == "__main__":
     parser.add_argument("-g", "--generate_plots", required=False, type=bool, nargs="?", const=False)
     parser.add_argument("-p", "--preprocess", required=False, type=str, nargs="?", const=None)    
     parser.add_argument("-l", "--learning", required=False, type=bool, nargs="?", const=False)
-    parser.add_argument("-o", "--optimize", required=False, type=str, nargs="?", const='HyperOpt')
-    parser.add_argument("-a", "--algorithm", required=False, type=str, nargs="?", const='SVR')
+    parser.add_argument("-o", "--optimize", required=False, type=str, nargs="?", const=None)
+    parser.add_argument("-a", "--algorithm", required=False, type=str, nargs="?", const='RF')
     parser.add_argument("-i", "--input", required=False, type=str)
 
     args = parser.parse_args()
@@ -59,9 +59,17 @@ if __name__ == "__main__":
     if args.nodes is None:
         args.nodes = 1
 
+    if args.algorithm is None:
+        args.algorithm = 'RF'
+
+    if args.survey is None:
+        args.survey = 'test'
+
     if args.survey == 'test':
         print('Modules loaded properly')
-        print(params.temp_path)
+
+    if args.preprocess is None:
+        args.preprocess = 'drop'
 
     elif args.survey == 'ps3pi_cfis' or args.survey == 'unions':
         
