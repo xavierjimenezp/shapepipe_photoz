@@ -20,7 +20,7 @@ path = os.getcwd() + '/'
 bands = ['R']
 output_path = path
 output_name = 'CFIS_matched_deep_2_3_catalog_R'
-temp_path = '/n17data/jimenez/temp/'
+temp_path = path + 'temp/'
 
 #------------------------------------------------------------------#
 # # # # # PREPROCESSING PARAMS # # # # #
