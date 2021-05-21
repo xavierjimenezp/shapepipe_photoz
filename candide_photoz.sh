@@ -2,7 +2,7 @@
 #PBS -S /bin/sh
 #PBS -N matching
 #PBS -j oe
-#PBS -l nodes=1:ppn=46,walltime=50:00:00
+#PBS -l nodes=1:ppn=8,walltime=50:00:00
 
 module () {
   eval $(/usr/bin/modulecmd bash $*)
@@ -16,9 +16,11 @@ module load intelpython/3
 module load openmpi/4.0.5
 source activate $SPENV
 
-cd ~/photoz
+cd /n17data/jimenez/photoz
 
-python photoz.py -c True -s ps3pi_cfis -i params
-python photoz.py -n 46 -m True -s ps3pi_cfis -i params
+#python photoz.py -n 8 -c True -m True -j True -s unions -i params
+#python photoz.py -n 8 -c True -u True -s unions -i params
+python photoz.py -p True -s unions -i params
+python photoz.py -n 4 -l True -p drop -a RF -s unions -i params
 
 exit 0 

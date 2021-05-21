@@ -208,13 +208,14 @@ class GeneratePlots(object):
 
         self.df_matched = pd.read_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/'  + self.output_name + '.csv')
         self.df_unmatched = pd.read_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name + '_unmatched'+'.csv')
-        # self.df_d2d = pd.read_csv(self.output_path + 'output/' + self.survey + '/files/' + self.output_name +'_d2d'+'.csv')
+
 
 
     def plot_d2d(self):
         """
         Distance distribution plot for matched galaxies
         """
+        df_d2d = pd.read_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name +'_d2d'+'.csv')
 
         fig =plt.figure(figsize=(8,8), tight_layout=False)
 
@@ -223,34 +224,35 @@ class GeneratePlots(object):
         ax.grid(True, color='grey', lw=0.5)
         ax.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
         ax.set_xlabel(r'$\mathrm{angular\;distance\;\left(arcsec\right)}$', fontsize=20)
-        ax.set_ylabel(r'$\mathrm{matched\;galaxies\;in}$'+' band R', fontsize=20)
+        ax.set_ylabel(r'$\mathrm{matched\;galaxies\;in\;} r-$'+'band', fontsize=20)
 
-        ax.hist(np.array(self.df_d2d['d2d'].values)*3600, bins = 50)
+        ax.hist(np.array(df_d2d['d2d'].values)*3600, bins = 100, range=[0,2])
+        ax.axvline(0.3, color='k', linestyle='--')
 
         plt.savefig(self.figure_path + self.figure_name + '.pdf', bbox_inches='tight', transparent=True)
         plt.show()
         plt.close()
 
-    def plot_mags(self, df_matched, df_unmatched):
+    def plot_mags(self, df_matched, df_unmatched, bands):
         """
         
         """
 
-        mags = ['MAG_AUTO_R', 'MAG_u', 'i_stk_aper', 'z_stk_aper', 'g_stk_aper']
-
         fig =plt.figure(figsize=(8,20), tight_layout=False)
 
-        for (i,mag) in enumerate(mags):
-            ax = fig.add_subplot(511+i)
+        for (i,mag) in enumerate(bands):
+            if self.survey == 'unions':
+                ax = fig.add_subplot(100*len(self._bands) + 11+i)
+            elif self.survey == 'ps3pi_cfis':
+                ax = fig.add_subplot(511+i)
             ax.set_facecolor('white')
             ax.grid(True, color='grey', lw=0.5)
-            ax.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
-            if i == len(mags)-1:
+            if i == len(bands)-1:
                 ax.set_xlabel('Magnitude', fontsize=20)
             ax.set_ylabel(mag, fontsize=20)
 
-            ax.hist(df_unmatched[mag], density=True, bins=50, label='unmatched', log=True, color='orange')
-            ax.hist(df_matched[mag], density=True, bins=50, label='matched', log=True, alpha=0.8)
+            ax.hist(df_unmatched[mag], density=True, bins=50, label='unmatched', color='k')
+            ax.hist(df_matched[mag], density=True, bins=50, label='matched',  alpha=0.8, color='grey')
             legend = ax.legend(loc='best', shadow=True, fontsize='x-large')
 
         plt.savefig(self.figure_path + 'Mags_' + self.figure_name + '.pdf', bbox_inches='tight', transparent=True)
@@ -490,7 +492,7 @@ class MakeCatalogs(object):
         return isdup
 
 
-    def make_catalog(self, p, paste_dir, input_path, spectral_name, vignet=True):
+    def make_catalog(self, p, paste_dir, matched_path, spectral_name, vignet=True):
         """Creates .csv catalogs with different flux & magnitudes in bands R,I,Z,G,Y
         as well as morphological parameters which are matched with a spectral catalog.
         Creates .npy 4D ndarrays & .png images for vignets
@@ -498,7 +500,7 @@ class MakeCatalogs(object):
         Args:
             p ([int]): Tile id (0 =< id < len(paste_dir))
             paste_dir ([list]): list containing tile names
-            input_path ([str]): directory path for paste_dir
+            matched_path ([str]): directory path for paste_dir
             spectral_name ([str]): [description]
             vignet (bool, optional): [description]. Defaults to True.
         """
@@ -510,10 +512,7 @@ class MakeCatalogs(object):
         df_Z = pd.read_csv(self.temp_path + self.survey + '/spectral_surveys/'+'z_%s'%spectral_name + '.csv')
 
         file_name = paste_dir[p]
-        HDU_tile = fits.open(input_path + file_name)
-
-        # BANDS = dict(zip(self._bands, np.arange(2,len(self._bands)+2)))
-        # BANDS = {'R':2, 'I':3, 'Z':4, 'G':5, 'Y':6}
+        HDU_tile = fits.open(matched_path + file_name)
 
         band = 'R'
 
@@ -545,6 +544,10 @@ class MakeCatalogs(object):
         # # # # # Check for duplicate coordinates # # # # #
         #------------------------------------------------------------------#
 
+        if df_to_cut.empty or len(df_to_cut)==1:
+            print('Empty file for tile %s'%(file_name[:-5]+'_'+spectral_name))
+            return 
+
         scatalog = SkyCoord(ra=df_to_cut['RA'].values, dec=df_to_cut['DEC'].values, unit='deg')
         isdup = self.check_dup_coord(coords=scatalog)
 
@@ -556,41 +559,41 @@ class MakeCatalogs(object):
         #------------------------------------------------------------------#
         # # # # # Spatial coordinates matching # # # # #
         #------------------------------------------------------------------#
-        if self.survey == 'unions':
+        # if self.survey == 'unions':
 
-            scatalog_sub = SkyCoord(ra=df_to_cut['RA'].values, dec=df_to_cut['DEC'].values, unit='deg')
-            pcatalog_sub = SkyCoord(ra=df_Z['RA'].values, dec=df_Z['DEC'].values, unit='deg')
-            idx, d2d, _ = match_coordinates_sky(scatalog_sub, pcatalog_sub, nthneighbor=1)
+        #     scatalog_sub = SkyCoord(ra=df_to_cut['RA'].values, dec=df_to_cut['DEC'].values, unit='deg')
+        #     pcatalog_sub = SkyCoord(ra=df_Z['RA'].values, dec=df_Z['DEC'].values, unit='deg')
+        #     idx, d2d, _ = match_coordinates_sky(scatalog_sub, pcatalog_sub, nthneighbor=1)
 
-            tol = 0.3*u.arcsecond #threshold to consider whether or not two galaxies are the same
-            ismatched = d2d < tol
+        #     tol = 0.3*u.arcsecond #threshold to consider whether or not two galaxies are the same
+        #     ismatched = d2d < tol
 
-            # try:
+        #     # try:
 
-            #------------------------------------------------------------------#
-            # # # # # Create matched dataframe with redshift # # # # #
-            #------------------------------------------------------------------#
+        #     #------------------------------------------------------------------#
+        #     # # # # # Create matched dataframe with redshift # # # # #
+        #     #------------------------------------------------------------------#
 
-            df_d2d = pd.DataFrame(data={'ismatched': ismatched, 'idx': idx, 'd2d': d2d, 'RA': df_to_cut['RA'].values,'DEC':df_to_cut['DEC'].values})
-            df_d2d.query("ismatched == True", inplace=True)
-            df_d2d.drop(columns=['ismatched'], inplace=True)
+        #     df_d2d = pd.DataFrame(data={'ismatched': ismatched, 'idx': idx, 'd2d': d2d, 'RA': df_to_cut['RA'].values,'DEC':df_to_cut['DEC'].values})
+        #     df_d2d.query("ismatched == True", inplace=True)
+        #     df_d2d.drop(columns=['ismatched'], inplace=True)
 
         
-            try:
-                idx_sub = np.array([(i,ide) for (i,ide) in enumerate(idx) if ismatched[i] == True])[:,1]
-            except:
-                print('0 matched objects wo filters for tile %s'%(file_name[:-5]+'_'+spectral_name))
-                return
+        #     try:
+        #         idx_sub = np.array([(i,ide) for (i,ide) in enumerate(idx) if ismatched[i] == True])[:,1]
+        #     except:
+        #         print('0 matched objects wo filters for tile %s'%(file_name[:-5]+'_'+spectral_name))
+        #         return
 
-            z_spec_sub = []
-            for i in idx_sub:
-                z_spec_sub.append(df_Z['Z_SPEC'].values[i])
-            z_spec_sub = np.array(z_spec_sub)
+        #     z_spec_sub = []
+        #     for i in idx_sub:
+        #         z_spec_sub.append(df_Z['Z_SPEC'].values[i])
+        #     z_spec_sub = np.array(z_spec_sub)
 
-            df_to_cut['ismatched'] = ismatched
-            df_to_cut.query("ismatched == True", inplace=True)
-            df_to_cut.drop(columns=['ismatched'], inplace=True)
-            df_to_cut['Z_SPEC'] = z_spec_sub
+        #     df_to_cut['ismatched'] = ismatched
+        #     df_to_cut.query("ismatched == True", inplace=True)
+        #     df_to_cut.drop(columns=['ismatched'], inplace=True)
+        #     df_to_cut['Z_SPEC'] = z_spec_sub
 
         #------------------------------------------------------------------#
         # # # # # Band extraction for dataframe # # # # #
@@ -610,7 +613,13 @@ class MakeCatalogs(object):
         except:
             print('Tile %s does not have the right number of bands'%(file_name[:-5]+'_'+spectral_name))
             return
-        df_mag = pd.DataFrame(data = dict(zip(NAMES, par)))
+
+        try:
+            df_mag = pd.DataFrame(data = dict(zip(NAMES, par)))
+        except:
+            print('Empty file for tile %s'%(file_name[:-5]+'_'+spectral_name))
+            return
+
         NAME = [file_name[4:-5]+'_%s'%i for i in range(len(df_mag))]
         ide = np.arange(0, len(df_mag), 1)
         df_mag.insert(0, 'ide', ide)
@@ -618,40 +627,40 @@ class MakeCatalogs(object):
 
 
 
-        if self.survey == 'ps3pi_cfis':
-            df_mag['Z_SPEC'] = HDU_tile['R'].data['Z'].tolist()
-            df_mag['id'] = HDU_tile[self._bands[0]].data['NUMBER'].tolist()
-            df_mag['ID'] = np.arange(0,len(df_mag),1).tolist()
-            ## merge
-            df_mag = pd.merge(df_mag, df_to_cut, indicator=True, on='ID', how='outer').query('_merge=="both"').drop('_merge', axis=1)
+        # if self.survey == 'ps3pi_cfis':
+        df_mag['Z_SPEC'] = HDU_tile['R'].data['Z'].tolist()
+        df_mag['id'] = HDU_tile[self._bands[0]].data['NUMBER'].tolist()
+        df_mag['ID'] = np.arange(0,len(df_mag),1).tolist()
+        ## merge
+        df_mag = pd.merge(df_mag, df_to_cut, indicator=True, on='ID', how='outer').query('_merge=="both"').drop('_merge', axis=1)
 
-            MORPHO_NAMES = ['id', 'gal_mag', 'gal_mag_err', 'gal_flux', 'gal_flux_err', 'gal_g1', 'gal_g1_err', 'gal_g2', 'gal_g2_err', 'gal_gini', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_resolution', 'psf_sigma']
-            morpho_par = [HDU_tile['R_PSF'].data[param].tolist() for param in MORPHO_NAMES]
-            df_morph = pd.DataFrame(data = dict(zip(MORPHO_NAMES, morpho_par)))
+        MORPHO_NAMES = ['id', 'gal_mag', 'gal_mag_err', 'gal_flux', 'gal_flux_err', 'gal_g1', 'gal_g1_err', 'gal_g2', 'gal_g2_err', 'gal_gini', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_resolution', 'psf_sigma']
+        morpho_par = [HDU_tile['R_PSF'].data[param].tolist() for param in MORPHO_NAMES]
+        df_morph = pd.DataFrame(data = dict(zip(MORPHO_NAMES, morpho_par)))
 
-            mv = LearningAlgorithms.missing_data(self, df_morph)
-            print(mv.head(10))
-            
-            dfbands = pd.merge(df_mag, df_morph, indicator=True, on='id', how='outer').query('_merge=="both"').drop('_merge', axis=1)
-            dfbands.drop(columns=['id'], inplace=True)
-            
-            dfbands_matched = dfbands.copy()
-            dfbands_matched = dfbands_matched[dfbands_matched['Z_SPEC'].notna()]
-            dfbands_unmatched = df_mag.copy()
+        # mv = LearningAlgorithms.missing_data(self, df_morph)
+        # print(mv.head(10))
+        
+        dfbands = pd.merge(df_mag, df_morph, indicator=True, on='id', how='outer').query('_merge=="both"').drop('_merge', axis=1)
+        dfbands.drop(columns=['id'], inplace=True)
+        
+        dfbands_matched = dfbands.copy()
+        dfbands_matched = dfbands_matched[dfbands_matched['Z_SPEC'].notna()]
+        dfbands_unmatched = df_mag.copy()
 
-        if self.survey == 'unions':
-            dfbands = df_mag.copy()
-            dfbands['ID'] = np.arange(0,len(dfbands),1).tolist()
-            ## merge
-            dfbands_matched = pd.merge(dfbands, df_to_cut, indicator=True, on='ID', how='left').query('_merge=="both"').drop('_merge', axis=1)
-            df_unmatched = df_to_cut.copy()
-            dfbands_unmatched = pd.merge(dfbands, df_unmatched, indicator=True, on='ID', how='left').query('_merge=="both"').drop('_merge', axis=1)
-
-
+        # if self.survey == 'unions':
+        #     dfbands = df_mag.copy()
+        #     dfbands['ID'] = np.arange(0,len(dfbands),1).tolist()
+        #     ## merge
+        #     dfbands_matched = pd.merge(dfbands, df_to_cut, indicator=True, on='ID', how='left').query('_merge=="both"').drop('_merge', axis=1)
+        #     df_unmatched = df_to_cut.copy()
+        #     dfbands_unmatched = pd.merge(dfbands, df_unmatched, indicator=True, on='ID', how='left').query('_merge=="both"').drop('_merge', axis=1)
 
 
-        if self.survey == 'ps3pi_cfis':
-            print(np.corrcoef(dfbands_matched['FWHM'], dfbands_matched['gal_sigma']))
+
+
+        # if self.survey == 'ps3pi_cfis':
+        # print(np.corrcoef(dfbands_matched['FWHM'], dfbands_matched['gal_sigma']))
 
 
         # replace 99 by np.nan in MAG cols (TO DO: replace whatever equivalent there is for FLUX cols)
@@ -688,7 +697,8 @@ class MakeCatalogs(object):
 
 
         # print(np.corrcoef(dfbands_matched['MAG_AUTO_R'], dfbands_matched['Z_SPEC']))
-        print('%i matched objects w filters for tile %s'%(len(dfbands_matched), file_name[:-5]+'_'+spectral_name))
+
+        # print('%i/%i matched objects w filters for tile %s'%(len(dfbands_matched), np.shape(par)[1], file_name[:-5]+'_'+spectral_name))
 
         dfbands_matched.drop(columns=['ID'], inplace=True)
         dfbands_matched.to_csv(self.temp_path + self.survey + '/matched/'+'%s'%file_name[:-5]+'_'+spectral_name+'.csv', index=False)
@@ -712,6 +722,457 @@ class MakeCatalogs(object):
             # print('Tile %s does not have the right number of bands'%(file_name[:-5]+'_'+spectral_name))
         # except:
         #     print('Tile %s did not match any spectral galaxy'%(file_name[:-5]+'_'+spectral_name))
+
+
+
+
+
+    def match_unmatched_catalog(self, p, paste_dir, unmatched_path, spectral_name):
+        """Creates .csv catalogs with different flux & magnitudes in bands R,I,Z,G,Y
+        as well as morphological parameters which are matched with a spectral catalog.
+        Creates .npy 4D ndarrays & .png images for vignets
+
+        Args:
+            p ([int]): Tile id (0 =< id < len(paste_dir))
+            paste_dir ([list]): list containing tile names
+            matched_path ([str]): directory path for paste_dir
+            spectral_name ([str]): [description]
+        """
+
+        #------------------------------------------------------------------#
+        # # # # # Extract data from catalogs # # # # #
+        #------------------------------------------------------------------#
+
+        df_Z = pd.read_csv(self.temp_path + self.survey + '/spectral_surveys/'+'z_%s'%spectral_name + '.csv')
+
+        file_name = paste_dir[p]
+        HDU_tile = fits.open(unmatched_path + file_name)
+
+        band = 'R'
+
+        RA = HDU_tile[band].data['X_WORLD'].tolist()
+        DEC = HDU_tile[band].data['Y_WORLD'].tolist()
+
+        SNR = HDU_tile[band].data['SNR_WIN'].tolist()
+        FWHM = HDU_tile[band].data['FWHM_WORLD'].tolist()
+        ELONGATION = HDU_tile[band].data['ELONGATION'].tolist()
+
+        MAG = HDU_tile[band].data['MAG_AUTO'].tolist()
+        MAG_ERR = HDU_tile[band].data['MAGERR_AUTO'].tolist()
+
+        ID = np.arange(0, len(HDU_tile[band].data['X_WORLD'].tolist()), 1)
+
+        df_to_cut = pd.DataFrame(data={'ID': ID, 'RA': RA, 'DEC': DEC, 'SNR': SNR, 'FWHM': FWHM, 'MAG': MAG, 'MAG_ERR': MAG_ERR, 'ELONGATION': ELONGATION})
+
+        #------------------------------------------------------------------#
+        # # # # # SNR & FWHM & MAG & MAG_ERR CUTS  # # # # #
+        #------------------------------------------------------------------#
+
+        if self.survey == 'unions':
+            df_to_cut.query("SNR > 10 & FWHM*3600 > 0.8 & MAG < 30 & MAG_ERR < 0.5", inplace=True)
+        if self.survey == 'ps3pi_cfis':
+            df_to_cut.query("SNR > 10 & SNR < 500 & FWHM*3600 > 0.8 & MAG < 30 & MAG_ERR < 0.5", inplace=True)
+        df_to_cut.drop(columns=['SNR', 'MAG_ERR', 'MAG'], inplace=True)
+
+        #------------------------------------------------------------------#
+        # # # # # Check for duplicate coordinates # # # # #
+        #------------------------------------------------------------------#
+
+        if df_to_cut.empty or len(df_to_cut)==1:
+            print('Empty file for tile %s'%(file_name[:-5]+'_'+spectral_name))
+            return 
+
+        scatalog = SkyCoord(ra=df_to_cut['RA'].values, dec=df_to_cut['DEC'].values, unit='deg')
+        isdup = self.check_dup_coord(coords=scatalog)
+
+        # sub arrays without duplicates for both catalogs
+        df_to_cut['isdup'] = isdup
+        df_to_cut.query("isdup == False", inplace=True)
+        df_to_cut.drop(columns=['isdup'], inplace=True)
+
+        #------------------------------------------------------------------#
+        # # # # # Spatial coordinates matching # # # # #
+        #------------------------------------------------------------------#
+
+        scatalog_sub = SkyCoord(ra=df_to_cut['RA'].values, dec=df_to_cut['DEC'].values, unit='deg')
+        pcatalog_sub = SkyCoord(ra=df_Z['RA'].values, dec=df_Z['DEC'].values, unit='deg')
+        idx, d2d, _ = match_coordinates_sky(scatalog_sub, pcatalog_sub, nthneighbor=1)
+
+        tol = 0.3*u.arcsecond #threshold to consider whether or not two galaxies are the same
+        ismatched = d2d < tol
+
+        # try:
+
+        #------------------------------------------------------------------#
+        # # # # # Create matched dataframe with redshift # # # # #
+        #------------------------------------------------------------------#
+
+        df_d2d = pd.DataFrame(data={'ismatched': ismatched, 'idx': idx, 'd2d': d2d, 'RA': df_to_cut['RA'].values,'DEC':df_to_cut['DEC'].values})
+        # df_d2d.query("ismatched == True", inplace=True)
+        # df_d2d.drop(columns=['ismatched'], inplace=True)
+
+    
+        try:
+            idx_sub = np.array([(i,ide) for (i,ide) in enumerate(idx) if ismatched[i] == True])[:,1]
+        except:
+            print('0 matched objects wo filters for tile %s'%(file_name[:-5]+'_'+spectral_name))
+            return
+
+        z_spec_sub = []
+        for i in idx_sub:
+            z_spec_sub.append(df_Z['Z_SPEC'].values[i])
+        z_spec_sub = np.array(z_spec_sub)
+
+        df_to_cut['ismatched'] = ismatched
+        df_to_cut.query("ismatched == True", inplace=True)
+        df_to_cut.drop(columns=['ismatched'], inplace=True)
+        df_to_cut['Z_SPEC'] = z_spec_sub
+
+        #------------------------------------------------------------------#
+        # # # # # Band extraction for dataframe # # # # #
+        #------------------------------------------------------------------#
+
+        PARAMS = ['FWHM_WORLD', 'SNR_WIN', 'MAG_AUTO','MAGERR_AUTO']
+        NAMES = np.array(['%s_%s'%(param, band) for param in PARAMS for band in self._bands])
+        MAG_ZEROPOINT_NAMES = np.array(['MAG_AUTO_%s'%band for band in self._bands[1:]])
+        MAG_NAMES = ['MAG_AUTO']
+        MAG_COLS = np.array(['%s_%s'%(param, band) for param in MAG_NAMES for band in self._bands[1:]])
+
+
+
+        # try:
+        try:
+            par = [HDU_tile[band].data[param].tolist() for param in PARAMS for band in self._bands]
+        except:
+            print('Tile %s does not have the right number of bands'%(file_name[:-5]+'_'+spectral_name))
+            return
+
+        try:
+            df_mag = pd.DataFrame(data = dict(zip(NAMES, par)))
+        except:
+            print('Empty file for tile %s'%(file_name[:-5]+'_'+spectral_name))
+            return
+
+        NAME = [file_name[4:-5]+'_%s'%i for i in range(len(df_mag))]
+        ide = np.arange(0, len(df_mag), 1)
+        df_mag.insert(0, 'ID', ide)
+        df_mag.insert(0, 'NAME', NAME)   
+
+        ## merge
+        dfbands_matched = pd.merge(df_mag, df_to_cut, indicator=True, on='ID', how='outer').query('_merge=="both"').drop('_merge', axis=1)
+        
+
+        # if self.survey == 'unions':
+        #     dfbands = df_mag.copy()
+        #     dfbands['ID'] = np.arange(0,len(dfbands),1).tolist()
+        #     ## merge
+        #     dfbands_matched = pd.merge(dfbands, df_to_cut, indicator=True, on='ID', how='left').query('_merge=="both"').drop('_merge', axis=1)
+        #     df_unmatched = df_to_cut.copy()
+        #     dfbands_unmatched = pd.merge(dfbands, df_unmatched, indicator=True, on='ID', how='left').query('_merge=="both"').drop('_merge', axis=1)
+
+
+
+
+        # if self.survey == 'ps3pi_cfis':
+        # print(np.corrcoef(dfbands_matched['FWHM'], dfbands_matched['gal_sigma']))
+
+
+        # replace 99 by np.nan in MAG cols (TO DO: replace whatever equivalent there is for FLUX cols)
+        for col in MAG_COLS:
+            dfbands_matched.loc[(dfbands_matched[col]>98), col] = np.nan
+
+        for band in self._bands:
+            if self.survey == 'ps3pi_cfis':
+                dfbands_matched.query("SNR_WIN_%s > 10 & SNR_WIN_%s < 500 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5" %(band,band,band,band) , inplace=True)
+            else:
+                dfbands_matched.query("SNR_WIN_%s > 10 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5" %(band,band,band) , inplace=True)                
+        for band in self._bands:
+            dfbands_matched.drop(columns=['SNR_WIN_%s'%band, 'FWHM_WORLD_%s'%band], inplace=True)
+
+        # keep only mags with err<0.5
+        # for name in MAGERR_NAMES:
+            # dfbands_matched.query("%s < 0.5"%name, inplace=True)
+            # dfbands_unmatched.query("%s < 0.5"%name, inplace=True)
+
+        # shift -5 mag
+        if self.survey == 'ps3pi_cfis':
+            for name in MAG_ZEROPOINT_NAMES:
+                dfbands_matched[name] = dfbands_matched[name] - 5
+
+
+        print(np.corrcoef(dfbands_matched['MAG_AUTO_R'], dfbands_matched['Z_SPEC']))
+
+        print('%i/%i matched objects w filters for tile %s'%(len(dfbands_matched), np.shape(par)[1], file_name[:-5]+'_'+spectral_name))
+
+        dfbands_matched.drop(columns=['ID'], inplace=True)
+        dfbands_matched.to_csv(self.temp_path + self.survey + '/matched/'+'%s'%file_name[:-5]+'_'+spectral_name+'.csv', index=False)
+
+        df_Z.to_csv(self.temp_path + self.survey + '/redshift/'+'%s'%file_name[:-5]+'_'+spectral_name+'.csv', index=False)
+        df_d2d.to_csv(self.temp_path + self.survey + '/d2d/'+'%s'%file_name[:-5]+'_'+spectral_name+'.csv', index=False)
+
+
+
+
+
+    def make_matched_catalog(self, p, paste_dir, matched_path, spectral_name, vignet=True):
+        """Creates .csv catalogs with different flux & magnitudes in bands R,I,Z,G,Y
+        as well as morphological parameters which are matched with a spectral catalog.
+        Creates .npy 4D ndarrays & .png images for vignets
+
+        Args:
+            p ([int]): Tile id (0 =< id < len(paste_dir))
+            paste_dir ([list]): list containing tile names
+            matched_path ([str]): directory path for paste_dir
+            spectral_name ([str]): [description]
+            vignet (bool, optional): [description]. Defaults to True.
+        """
+
+        #------------------------------------------------------------------#
+        # # # # # Extract data from catalogs # # # # #
+        #------------------------------------------------------------------#
+
+        df_Z = pd.read_csv(self.temp_path + self.survey + '/spectral_surveys/'+'z_%s'%spectral_name + '.csv')
+
+        file_name = paste_dir[p]
+        HDU_tile = fits.open(matched_path + file_name)
+
+        band = 'R'
+
+        RA = HDU_tile[band].data['X_WORLD'].tolist()
+        DEC = HDU_tile[band].data['Y_WORLD'].tolist()
+
+        SNR = HDU_tile[band].data['SNR_WIN'].tolist()
+        FWHM = HDU_tile[band].data['FWHM_WORLD'].tolist()
+        ELONGATION = HDU_tile[band].data['ELONGATION'].tolist()
+
+        MAG = HDU_tile[band].data['MAG_AUTO'].tolist()
+        MAG_ERR = HDU_tile[band].data['MAGERR_AUTO'].tolist()
+
+        ID = np.arange(0, len(HDU_tile[band].data['X_WORLD'].tolist()), 1)
+
+        df_to_cut = pd.DataFrame(data={'ID': ID, 'RA': RA, 'DEC': DEC, 'SNR': SNR, 'FWHM': FWHM, 'MAG': MAG, 'MAG_ERR': MAG_ERR, 'ELONGATION': ELONGATION})
+
+        #------------------------------------------------------------------#
+        # # # # # SNR & FWHM & MAG & MAG_ERR CUTS  # # # # #
+        #------------------------------------------------------------------#
+
+        if self.survey == 'unions':
+            df_to_cut.query("SNR > 10 & FWHM*3600 > 0.8 & MAG < 30 & MAG_ERR < 0.5", inplace=True)
+        if self.survey == 'ps3pi_cfis':
+            df_to_cut.query("SNR > 10 & SNR < 500 & FWHM*3600 > 0.8 & MAG < 30 & MAG_ERR < 0.5", inplace=True)
+        df_to_cut.drop(columns=['SNR', 'MAG_ERR', 'MAG'], inplace=True)
+
+        #------------------------------------------------------------------#
+        # # # # # Check for duplicate coordinates # # # # #
+        #------------------------------------------------------------------#
+
+        if df_to_cut.empty or len(df_to_cut)==1:
+            print('Empty file for tile %s'%(file_name[:-5]+'_'+spectral_name))
+            return 
+
+        scatalog = SkyCoord(ra=df_to_cut['RA'].values, dec=df_to_cut['DEC'].values, unit='deg')
+        isdup = self.check_dup_coord(coords=scatalog)
+
+        # sub arrays without duplicates for both catalogs
+        df_to_cut['isdup'] = isdup
+        df_to_cut.query("isdup == False", inplace=True)
+        df_to_cut.drop(columns=['isdup'], inplace=True)
+
+        #------------------------------------------------------------------#
+        # # # # # Band extraction for dataframe # # # # #
+        #------------------------------------------------------------------#
+
+        PARAMS = ['FWHM_WORLD', 'SNR_WIN' ,'MAG_AUTO','MAGERR_AUTO', 'MAG_WIN', 'MAGERR_WIN', 'FLUX_AUTO', 'FLUXERR_AUTO', 'FLUX_WIN', 'FLUXERR_WIN', 'FLUX_APER', 'FLUXERR_APER']
+        NAMES = np.array(['%s_%s'%(param, band) for param in PARAMS for band in self._bands])
+        MAG_ZEROPOINT_NAMES = np.array(['MAG_AUTO_%s'%band for band in self._bands[1:]])
+        MAG_NAMES = ['MAG_AUTO', 'MAG_WIN']
+        MAG_COLS = np.array(['%s_%s'%(param, band) for param in MAG_NAMES for band in self._bands[1:]])
+
+        try:
+            par = [HDU_tile[band].data[param].tolist() for param in PARAMS for band in self._bands]
+        except:
+            print('Tile %s does not have the right number of bands'%(file_name[:-5]+'_'+spectral_name))
+            return
+
+        try:
+            df_mag = pd.DataFrame(data = dict(zip(NAMES, par)))
+        except:
+            print('Empty file for tile %s'%(file_name[:-5]+'_'+spectral_name))
+            return
+
+        NAME = [file_name[4:-5]+'_%s'%i for i in range(len(df_mag))]
+        ide = np.arange(0, len(df_mag), 1)
+        df_mag.insert(0, 'ide', ide)
+        df_mag.insert(0, 'NAME', NAME)   
+
+
+        df_mag['Z_SPEC'] = HDU_tile['R'].data['Z'].tolist()
+        df_mag['id'] = HDU_tile[self._bands[0]].data['NUMBER'].tolist()
+        df_mag['ID'] = np.arange(0,len(df_mag),1).tolist()
+        ## merge
+        df_mag = pd.merge(df_mag, df_to_cut, indicator=True, on='ID', how='outer').query('_merge=="both"').drop('_merge', axis=1)
+
+        MORPHO_NAMES = ['id', 'gal_mag', 'gal_mag_err', 'gal_flux', 'gal_flux_err', 'gal_g1', 'gal_g1_err', 'gal_g2', 'gal_g2_err', 'gal_gini', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_resolution', 'psf_sigma']
+        morpho_par = [HDU_tile['R_PSF'].data[param].tolist() for param in MORPHO_NAMES]
+        df_morph = pd.DataFrame(data = dict(zip(MORPHO_NAMES, morpho_par)))
+
+        # mv = LearningAlgorithms.missing_data(self, df_morph)
+        # print(mv.head(10))
+        
+        dfbands = pd.merge(df_mag, df_morph, indicator=True, on='id', how='outer').query('_merge=="both"').drop('_merge', axis=1)
+        dfbands.drop(columns=['id'], inplace=True)
+        
+        dfbands_matched = dfbands.copy()
+        dfbands_matched = dfbands_matched[dfbands_matched['Z_SPEC'].notna()]
+
+        # replace 99 by np.nan in MAG cols (TO DO: replace whatever equivalent there is for FLUX cols)
+        for col in MAG_COLS:
+            dfbands_matched.loc[(dfbands_matched[col]>98), col] = np.nan
+
+        for band in self._bands:
+            if self.survey == 'ps3pi_cfis':
+                dfbands_matched.query("SNR_WIN_%s > 10 & SNR_WIN_%s < 500 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5 & gal_mag_err < 0.5" %(band,band,band,band) , inplace=True)
+            else:
+                dfbands_matched.query("SNR_WIN_%s > 10 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5" %(band,band,band) , inplace=True)
+        for band in self._bands:
+            dfbands_matched.drop(columns=['SNR_WIN_%s'%band, 'FWHM_WORLD_%s'%band], inplace=True)
+
+        # shift -5 mag
+        if self.survey == 'ps3pi_cfis':
+            for name in MAG_ZEROPOINT_NAMES:
+                dfbands_matched[name] = dfbands_matched[name] - 5
+
+        # save png vignets & array
+        if vignet == True:
+            self.vignet_to_png(file_name, dfbands_matched, HDU_tile)
+            self.vignet_to_array(file_name, dfbands_matched, HDU_tile)
+
+
+        # print(np.corrcoef(dfbands_matched['MAG_AUTO_R'], dfbands_matched['Z_SPEC']))
+
+        # print('%i/%i matched objects w filters for tile %s'%(len(dfbands_matched), np.shape(par)[1], file_name[:-5]+'_'+spectral_name))
+
+        dfbands_matched.drop(columns=['ID'], inplace=True)
+        dfbands_matched.query("Z_SPEC > 0", inplace=True)
+        dfbands_matched.to_csv(self.temp_path + self.survey + '/matched/'+'%s'%file_name[:-5]+'_'+spectral_name+'.csv', index=False)
+    
+        df_Z.to_csv(self.temp_path + self.survey + '/redshift/'+'%s'%file_name[:-5]+'_'+spectral_name+'.csv', index=False)
+
+
+
+    def make_unmatched_catalog(self, p, paste_dir, unmatched_path, spectral_name):
+        """Creates .csv catalogs with different flux & magnitudes in bands R,I,Z,G,Y
+        as well as morphological parameters which are matched with a spectral catalog.
+
+        Args:
+            p ([int]): Tile id (0 =< id < len(paste_dir))
+            paste_dir ([list]): list containing tile names
+            matched_path ([str]): directory path for paste_dir
+            spectral_name ([str]): [description]
+        """
+
+        #------------------------------------------------------------------#
+        # # # # # Extract data from catalogs # # # # #
+        #------------------------------------------------------------------#
+
+        file_name = paste_dir[p]
+        HDU_tile = fits.open(unmatched_path + file_name)
+
+        band = 'R'
+
+        RA = HDU_tile[band].data['X_WORLD'].tolist()
+        DEC = HDU_tile[band].data['Y_WORLD'].tolist()
+
+        SNR = HDU_tile[band].data['SNR_WIN'].tolist()
+        FWHM = HDU_tile[band].data['FWHM_WORLD'].tolist()
+        ELONGATION = HDU_tile[band].data['ELONGATION'].tolist()
+
+        MAG = HDU_tile[band].data['MAG_AUTO'].tolist()
+        MAG_ERR = HDU_tile[band].data['MAGERR_AUTO'].tolist()
+
+        ID = np.arange(0, len(HDU_tile[band].data['X_WORLD'].tolist()), 1)
+
+        df_to_cut = pd.DataFrame(data={'ID': ID, 'RA': RA, 'DEC': DEC, 'SNR': SNR, 'FWHM': FWHM, 'MAG': MAG, 'MAG_ERR': MAG_ERR, 'ELONGATION': ELONGATION})
+
+        #------------------------------------------------------------------#
+        # # # # # SNR & FWHM & MAG & MAG_ERR CUTS  # # # # #
+        #------------------------------------------------------------------#
+
+        if self.survey == 'unions':
+            df_to_cut.query("SNR > 10 & FWHM*3600 > 0.8 & MAG < 30 & MAG_ERR < 0.5", inplace=True)
+        if self.survey == 'ps3pi_cfis':
+            df_to_cut.query("SNR > 10 & SNR < 500 & FWHM*3600 > 0.8 & MAG < 30 & MAG_ERR < 0.5", inplace=True)
+        df_to_cut.drop(columns=['SNR', 'MAG_ERR', 'MAG'], inplace=True)
+
+        #------------------------------------------------------------------#
+        # # # # # Check for duplicate coordinates # # # # #
+        #------------------------------------------------------------------#
+
+        if df_to_cut.empty or len(df_to_cut)==1:
+            print('Empty file for tile %s'%(file_name[:-5]+'_'+spectral_name))
+            return 
+
+        scatalog = SkyCoord(ra=df_to_cut['RA'].values, dec=df_to_cut['DEC'].values, unit='deg')
+        isdup = self.check_dup_coord(coords=scatalog)
+
+        # sub arrays without duplicates for both catalogs
+        df_to_cut['isdup'] = isdup
+        df_to_cut.query("isdup == False", inplace=True)
+        df_to_cut.drop(columns=['isdup'], inplace=True)
+
+        #------------------------------------------------------------------#
+        # # # # # Band extraction for dataframe # # # # #
+        #------------------------------------------------------------------#
+
+        PARAMS = ['FWHM_WORLD', 'SNR_WIN' ,'MAG_AUTO', 'MAGERR_AUTO']
+        NAMES = np.array(['%s_%s'%(param, band) for param in PARAMS for band in self._bands])
+        MAG_ZEROPOINT_NAMES = np.array(['MAG_AUTO_%s'%band for band in self._bands[1:]])
+        MAG_NAMES = ['MAG_AUTO']
+        MAG_COLS = np.array(['%s_%s'%(param, band) for param in MAG_NAMES for band in self._bands[1:]])
+
+        try:
+            par = [HDU_tile[band].data[param].tolist() for param in PARAMS for band in self._bands]
+        except:
+            print('Tile %s does not have the right number of bands'%(file_name[:-5]+'_'+spectral_name))
+            return
+
+        try:
+            df_mag = pd.DataFrame(data = dict(zip(NAMES, par)))
+        except:
+            print('Empty file for tile %s'%(file_name[:-5]+'_'+spectral_name))
+            return
+
+        NAME = [file_name[4:-5]+'_%s'%i for i in range(len(df_mag))]
+        ide = np.arange(0, len(df_mag), 1)
+        df_mag.insert(0, 'ide', ide)
+        df_mag.insert(0, 'NAME', NAME)   
+
+        df_mag['id'] = HDU_tile[self._bands[0]].data['NUMBER'].tolist()
+        df_mag['ID'] = np.arange(0,len(df_mag),1).tolist()
+        ## merge
+        df_mag = pd.merge(df_mag, df_to_cut, indicator=True, on='ID', how='outer').query('_merge=="both"').drop('_merge', axis=1)
+        dfbands_unmatched = df_mag.copy()
+
+
+        # replace 99 by np.nan in MAG cols (TO DO: replace whatever equivalent there is for FLUX cols)
+        for col in MAG_COLS:
+            dfbands_unmatched.loc[(dfbands_unmatched[col]>98), col] = np.nan
+
+        for band in self._bands:
+            if self.survey == 'ps3pi_cfis':
+                dfbands_unmatched.query("SNR_WIN_%s > 10 & SNR_WIN_%s < 500 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5" %(band,band,band,band) , inplace=True)
+            else:
+                dfbands_unmatched.query("SNR_WIN_%s > 10 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5" %(band,band,band) , inplace=True)                
+        for band in self._bands:
+            dfbands_unmatched.drop(columns=['SNR_WIN_%s'%band, 'FWHM_WORLD_%s'%band], inplace=True)
+
+        # shift -5 mag
+        if self.survey == 'ps3pi_cfis':
+            for name in MAG_ZEROPOINT_NAMES:
+                dfbands_unmatched[name] = dfbands_unmatched[name] - 5
+
+        dfbands_unmatched.drop(columns=['ID'], inplace=True)
+        dfbands_unmatched.to_csv(self.temp_path + self.survey + '/unmatched/'+'%s'%file_name[:-5]+'_'+spectral_name+'.csv', index=False)
 
 
 
@@ -757,7 +1218,7 @@ class MakeCatalogs(object):
         np.save(self.temp_path + self.survey + '/vignet/array/vignet_%s'% file_name[:-5], X)
 
 
-    def merge_catalogs(self, vignet=True):
+    def merge_catalogs(self, vignet=True, d2d = False, matched=True, unmatched=True):
         """[summary]
 
         Args:
@@ -768,18 +1229,19 @@ class MakeCatalogs(object):
         # # # # # CSV files # # # # #
         #------------------------------------------------------------------#
 
-        # Import temp files
-        path_matched = self.temp_path + self.survey + '/matched/'
-        all_files = glob.glob(os.path.join(path_matched, "*.csv"))
-        df_matched_short = pd.concat((pd.read_csv(f) for f in all_files), axis=0)
-        # Remove duplicates
-        scatalog = SkyCoord(ra=df_matched_short['RA'].values, dec=df_matched_short['DEC'].values, unit='deg')
-        isdup = self.check_dup_coord(coords=scatalog)
-        df_matched_short['isdup'] = isdup
-        df_matched_short.query("isdup == False", inplace=True)
-        df_matched_short.drop(columns=['isdup'], inplace=True)
-        # Save file
-        df_matched_short.to_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name + '.csv', index=False)
+        if matched == True:
+            # Import temp files
+            path_matched = self.temp_path + self.survey + '/matched/'
+            all_files = glob.glob(os.path.join(path_matched, "*.csv"))
+            df_matched_short = pd.concat((pd.read_csv(f) for f in all_files), axis=0)
+            # Remove duplicates
+            scatalog = SkyCoord(ra=df_matched_short['RA'].values, dec=df_matched_short['DEC'].values, unit='deg')
+            isdup = self.check_dup_coord(coords=scatalog)
+            df_matched_short['isdup'] = isdup
+            df_matched_short.query("isdup == False", inplace=True)
+            df_matched_short.drop(columns=['isdup'], inplace=True)
+            # Save file
+            df_matched_short.to_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name + '.csv', index=False)
 
         if vignet == True:
             # Import temp files
@@ -800,36 +1262,59 @@ class MakeCatalogs(object):
             np.save(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name, vignet_nodup)
 
 
-        # # Import temp files
-        # path_matched_d2d = self.temp_path + self.survey + '/d2d/'
-        # all_files = glob.glob(os.path.join(path_matched_d2d, "*.csv"))
-        # df_matched_d2d = pd.concat((pd.read_csv(f) for f in all_files), axis=0)
-        # # Remove duplicates
-        # scatalog = SkyCoord(ra=df_matched_d2d['RA'].values, dec=df_matched_d2d['DEC'].values, unit='deg')
-        # isdup = self.check_dup_coord(coords=scatalog)
-        # df_matched_d2d['isdup'] = isdup
-        # df_matched_d2d.query("isdup == False", inplace=True)
-        # df_matched_d2d.drop(columns=['isdup', 'RA', 'DEC'], inplace=True)
-        # # Save file
-        # df_matched_d2d.to_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name + '_d2d' + '.csv', index=False)
-
         # Import temp files
-        path_unmatched_short = self.temp_path + self.survey + '/unmatched/'
-        all_files = glob.glob(os.path.join(path_unmatched_short, "*.csv"))
-        df_unmatched_short = pd.concat((pd.read_csv(f) for f in all_files), axis=0)
-        # Remove duplicates
-        scatalog = SkyCoord(ra=df_unmatched_short['RA'].values, dec=df_unmatched_short['DEC'].values, unit='deg')
-        isdup = self.check_dup_coord(coords=scatalog)
-        df_unmatched_short['isdup'] = isdup
-        df_unmatched_short.query("isdup == False", inplace=True)
-        df_unmatched_short.drop(columns=['isdup'], inplace=True)
-        # Save file
-        df_unmatched_short.to_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name + '_unmatched' + '.csv', index=False)
+        if d2d == True:
+            path_matched_d2d = self.temp_path + self.survey + '/d2d/'
+            all_files = glob.glob(os.path.join(path_matched_d2d, "*.csv"))
+            df_matched_d2d = pd.concat((pd.read_csv(f) for f in all_files), axis=0)
+            # Remove duplicates
+            scatalog = SkyCoord(ra=df_matched_d2d['RA'].values, dec=df_matched_d2d['DEC'].values, unit='deg')
+            isdup = self.check_dup_coord(coords=scatalog)
+            df_matched_d2d['isdup'] = isdup
+            df_matched_d2d.query("isdup == False", inplace=True)
+            df_matched_d2d.drop(columns=['isdup', 'RA', 'DEC'], inplace=True)
+            # Save file
+            df_matched_d2d.to_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name + '_d2d' + '.csv', index=False)
+
+        if unmatched == True:
+            # Import temp files
+            path_unmatched_short = self.temp_path + self.survey + '/unmatched/'
+            all_files = glob.glob(os.path.join(path_unmatched_short, "*.csv"))
+            df_unmatched_short = pd.concat((pd.read_csv(f) for f in all_files), axis=0)
+            # Remove duplicates
+            scatalog = SkyCoord(ra=df_unmatched_short['RA'].values, dec=df_unmatched_short['DEC'].values, unit='deg')
+            isdup = self.check_dup_coord(coords=scatalog)
+            df_unmatched_short['isdup'] = isdup
+            df_unmatched_short.query("isdup == False", inplace=True)
+            df_unmatched_short.drop(columns=['isdup'], inplace=True)
+            # Save file
+            df_unmatched_short.to_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name + '_unmatched' + '.csv', index=False)
+
+        print("Successfully joined individual tile catalogs, output can be found at %s"%(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/'))
+
 
     
-    def compute_weights(self, df_matched, column='r'):
+    def compute_weights_per_band(self, df_matched, column='r'):
         df_unmatched = pd.read_csv(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + self.output_name + '_unmatched' + '.csv')
         df_unmatched.rename(columns={"MAG_AUTO_R": "r"}, inplace=True)
+        try:
+            df_unmatched.rename(columns={"MAG_AUTO_I": "i"}, inplace=True)
+        except:
+            df_unmatched.rename(columns={"i_stk_aper": "i"}, inplace=True)
+        try:
+            df_unmatched.rename(columns={"MAG_AUTO_Z": "z"}, inplace=True)
+        except:
+            df_unmatched.rename(columns={"z_stk_aper": "z"}, inplace=True)
+        try:
+            df_unmatched.rename(columns={"g_stk_aper": "g"}, inplace=True)
+        except:
+            pass
+        try:
+            df_unmatched.rename(columns={"MAG_AUTO_U": "u"}, inplace=True)
+        except:
+            df_unmatched.rename(columns={"MAG_u": "u"}, inplace=True)
+        
+
         n = len(df_matched)//10
 
         udensity, ubins_edge = np.histogram(df_unmatched[column].values, bins=n, density=True)
@@ -875,9 +1360,29 @@ class MakeCatalogs(object):
         w = df_matched['weights'].to_numpy()
         df_matched.drop(columns=['weights', 'ID'], inplace=True)
 
-        np.save(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + 'Weights_' + self.output_name, w)
-
         return w
+
+    def compute_weights(self, df_matched, column=None):
+        if column is not None:
+            weight = self.compute_weights_per_band(df_matched, column=column)
+        
+        elif column is None:
+            if self.survey == 'unions':
+                bands = ['r', 'u', 'i', 'z']
+            elif self.survey == 'ps3pi_cfis':
+                bands = ['r', 'u', 'i', 'z', 'g']
+            
+            weight_list = []
+            for i,band in enumerate(bands):
+                if i<len(self._bands):
+                    weight_list.append(self.compute_weights_per_band(df_matched, column=band))
+
+            weight = np.mean(weight_list, axis=0)
+
+        np.save(self.output_path + 'output/' + self.survey + '/' + self.output_name + '/files/' + 'Weights_' + self.output_name, weight)
+
+        return weight
+
 
 
 
@@ -948,11 +1453,33 @@ class LearningAlgorithms(object):
     def dataframe(self):
         return self.df
 
-    def unmatched_dataframe(self):
-        return pd.read_csv(self.output_path + 'output/' + self.survey + '/files/' + self.output_name + '_unmatched' + '.csv')
+    def rename_unmatched_dataframe(self):
+        if self.survey == 'unions':
+            df = pd.read_csv(self.output_path + 'files/' + self.output_name + '_unmatched' + '.csv')
+            df = df[['MAG_AUTO_R', 'MAG_AUTO_U', 'MAG_AUTO_I', 'MAG_AUTO_Z']].copy()
+            df.rename(columns={"MAG_AUTO_R": "r", "MAG_AUTO_U": "u", "MAG_AUTO_I": "i", "MAG_AUTO_Z": "z"}, inplace=True)
+            df.to_csv(self.output_path + 'files/' + self.output_name + '_unmatched_renamed.csv', index=False)
+        else:
+            raise SyntaxError('This function only supports unions data')
+
+        return df
+
+    def rename_matched_dataframe(self, morph=True):
+        if self.survey == 'unions': 
+            if morph == True:
+                df = self.df[['MAG_AUTO_R', 'MAG_AUTO_U', 'MAG_AUTO_I', 'MAG_AUTO_Z', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_gini', 'ELONGATION', 'Z_SPEC']].copy()
+                df.rename(columns={"MAG_AUTO_R": "r", "MAG_AUTO_U": "u", "MAG_AUTO_I": "i", "MAG_AUTO_Z": "z", "gal_sb": "Surf. bright.", "gal_rho4": "Rho4", "gal_sigma": "Galaxy size", "gal_gini": "Gini index", "ELONGATION": "Elongation", "Z_SPEC": "Z spec"}, inplace=True)
+                df.to_csv(self.output_path + 'files/' + self.output_name + '_renamed.csv', index=False)
+            if morph == False:
+                df = self.df[['MAG_AUTO_R', 'MAG_AUTO_U', 'MAG_AUTO_I', 'MAG_AUTO_Z', 'Z_SPEC']].copy()
+                df.rename(columns={"MAG_AUTO_R": "r", "MAG_AUTO_U": "u", "MAG_AUTO_I": "i", "MAG_AUTO_Z": "z", "Z_SPEC": "Z spec"}, inplace=True)
+                df.to_csv(self.output_path + 'files/' + self.output_name + '_renamed.csv', index=False)
+        else:
+            raise SyntaxError('This function only supports unions data')
+        return df
 
 
-    def merge_cfis_r_cfht_u_medium_deep_i_g_z(self):
+    def merge_cfis_r_cfht_u_medium_deep_i_g_z(self, morphology=True):
 
         CFHT = pd.read_csv(self._path+'catalogs/CFHTLens_2021-01-25T12_32_19.tsv', delimiter='\t')
         CFHT = CFHT.replace(-99, 0)
@@ -1027,15 +1554,12 @@ class LearningAlgorithms(object):
         r_df.to_csv(self.output_path + 'files/' + 'R_CFHT_vs_CFIS.csv', index=False)
         df_medium.drop(columns=['MAG_r'], inplace=True)
 
-
-        df_medium = df_medium[['MAG_AUTO_R', 'MAG_u', 'i_stk_aper', 'z_stk_aper', 'g_stk_aper', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_gini', 'ELONGATION', 'Z_SPEC']].copy()
-        df_medium.rename(columns={"MAG_AUTO_R": "r", "MAG_u": "u", "i_stk_aper": "i", "z_stk_aper": "z", "g_stk_aper": "g", "gal_sb": "Surf. bright.", "gal_rho4": "Rho4", "gal_sigma": "Galaxy size", "gal_gini": "Gini index", "ELONGATION": "Elongation", "Z_SPEC": "Z spec"}, inplace=True)
-        
-        # df_medium = df_medium[['gal_rho4', 'gal_sigma', 'gal_gini', 'ELONGATION', 'Z_SPEC']].copy()
-        # df_medium.rename(columns={"gal_rho4": "Rho4", "gal_sigma": "Galaxy size", "gal_gini": "Gini index", "ELONGATION": "Elongation", "Z_SPEC": "Z spec"}, inplace=True)
-        
-        # df_medium = df_medium[['MAG_AUTO_R', 'MAG_u', 'i_stk_aper', 'z_stk_aper', 'g_stk_aper', 'Z_SPEC']].copy()
-        # df_medium.rename(columns={"MAG_AUTO_R": "r", "MAG_u": "u", "i_stk_aper": "i", "z_stk_aper": "z", "g_stk_aper": "g", "Z_SPEC": "Z spec"}, inplace=True)
+        if morphology == True:
+            df_medium = df_medium[['MAG_AUTO_R', 'MAG_u', 'i_stk_aper', 'z_stk_aper', 'g_stk_aper', 'gal_sb', 'gal_rho4', 'gal_sigma', 'gal_gini', 'ELONGATION', 'Z_SPEC']].copy()
+            df_medium.rename(columns={"MAG_AUTO_R": "r", "MAG_u": "u", "i_stk_aper": "i", "z_stk_aper": "z", "g_stk_aper": "g", "gal_sb": "Surf. bright.", "gal_rho4": "Rho4", "gal_sigma": "Galaxy size", "gal_gini": "Gini index", "ELONGATION": "Elongation", "Z_SPEC": "Z spec"}, inplace=True)
+        else:
+            df_medium = df_medium[['MAG_AUTO_R', 'MAG_u', 'i_stk_aper', 'z_stk_aper', 'g_stk_aper', 'Z_SPEC']].copy()
+            df_medium.rename(columns={"MAG_AUTO_R": "r", "MAG_u": "u", "i_stk_aper": "i", "z_stk_aper": "z", "g_stk_aper": "g", "Z_SPEC": "Z spec"}, inplace=True)
         
         df_medium.to_csv(self.output_path + 'files/' + 'MediumDeep_IZG_CFHT_U_CFIS_R_catalog.csv', index=False)
 

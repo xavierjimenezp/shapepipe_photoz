@@ -22,7 +22,7 @@ from tqdm import tqdm
 import argparse
 
 import warnings
-warnings.filterwarnings('ignore')
+# warnings.filterwarnings('ignore')
 from functions import *
 
 #------------------------------------------------------------------#
@@ -36,6 +36,7 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--survey", required=False, type=str, nargs="?", const='test')
     parser.add_argument("-c", "--clean", required=False, type=bool, nargs="?", const=False)
     parser.add_argument("-m", "--make", required=False, type=bool, nargs="?", const=False)
+    parser.add_argument("-u", "--unmatched", required=False, type=bool, nargs="?", const=False)
     parser.add_argument("-j", "--join", required=False, type=bool, nargs="?", const=False)
     parser.add_argument("-g", "--generate_plots", required=False, type=bool, nargs="?", const=False)
     parser.add_argument("-p", "--preprocess", required=False, type=str, nargs="?", const=None)    
@@ -53,26 +54,24 @@ if __name__ == "__main__":
     path = os.getcwd() + '/'
     if args.input is None:
         import params
+        warnings.simplefilter("always")
+        warnings.warn("No parameter file was given, 'params.py' will be used")
+        
     else:
         params = importlib.import_module(args.input)
     
     if args.nodes is None:
         args.nodes = 1
 
-    if args.algorithm is None:
-        args.algorithm = 'RF'
-
     if args.survey is None:
         args.survey = 'test'
 
     if args.survey == 'test':
         print('Modules loaded properly')
+        warnings.simplefilter("always")
+        warnings.warn("No survey name was given, please use 'ps3pi_cfis' or 'unions'")
 
-    if args.preprocess is None:
-        args.preprocess = 'drop'
-
-    elif args.survey == 'ps3pi_cfis' or args.survey == 'unions':
-        
+    if args.survey == 'ps3pi_cfis' or args.survey == 'unions':
         bands = params.bands
         output_path = params.output_path
         output_name = params.output_name
@@ -86,6 +85,7 @@ if __name__ == "__main__":
             GenFiles = GenerateFiles(args.survey, bands, temp_path, output_name, output_path)
             GenFiles.clean_temp_directories()
             GenFiles.make_directories()
+            print('Cleaned directories')
 
         #------------------------------------------------------------------#
         # # # # # MAKE INDIVIDUAL TILE CATALOGS # # # # #
@@ -94,7 +94,6 @@ if __name__ == "__main__":
         if args.make == True:
             spectral_path = params.spectral_path
             spectral_names = params.spectral_names
-            path_to_tile_run = params.path_to_tile_run
             spectral_surveys = params.spectral_surveys
             vignet = params.vignet
 
@@ -103,20 +102,68 @@ if __name__ == "__main__":
 
             for i in range(len(spectral_names)):
                 cat.make_survey_catalog(spectral_path, spectral_names[i])
-                if params.input_path == None:
-                    out_dir = os.listdir(path_to_tile_run + args.survey + '/%s/output/'%(spectral_surveys[i]))[-1]
-                    input_path = path_to_tile_run + args.survey + '/%s/output/%s/paste_cat_runner/output/'%(spectral_surveys[i], out_dir)
-                else:
-                    input_path = params.input_path
-                paste_dir = os.listdir(input_path)
-                Parallel(n_jobs=args.nodes)(delayed(cat.make_catalog)(p, paste_dir, input_path, spectral_names[i], vignet=vignet) for p in tqdm(range(len(paste_dir))))
 
+                try: ## Compatibility for using input_path=str or None
+                    input_path = params.input_path
+                    warnings.simplefilter("always")
+                    warnings.warn("'input_path' param is deprecated, please use 'matched_path'/'unmatched_path' instead", DeprecationWarning)
+
+                    if input_path == None:
+                        path_to_tile_run = params.path_to_tile_run
+                        out_dir = os.listdir(path_to_tile_run + args.survey + '/%s/output/'%(spectral_surveys[i]))[-1]
+                        warnings.simplefilter("always")
+                        warnings.warn("'input_path = None' is deprecated, please use 'matched_path'/'unmatched_path' instead", DeprecationWarning)
+                        input_path = path_to_tile_run + args.survey + '/%s/output/%s/paste_cat_runner/output/'%(spectral_surveys[i], out_dir)
+
+                    else:
+                        input_path = params.input_path
+
+                    paste_dir = os.listdir(input_path)
+                    Parallel(n_jobs=args.nodes)(delayed(cat.make_catalog)(p, paste_dir, matched_path=input_path, unmatched_path=input_path, spectral_name=spectral_names[i], vignet=vignet) for p in tqdm(range(len(paste_dir))))
+
+                except: #Up to date version
+                    matched_path, unmatched_path = params.matched_path, params.unmatched_path
+                    paste_dir = os.listdir(matched_path)
+                    Parallel(n_jobs=args.nodes)(delayed(cat.make_matched_catalog)(p, paste_dir, matched_path=matched_path, spectral_name=spectral_names[i], vignet=vignet) for p in tqdm(range(len(paste_dir))))
+                    paste_dir = os.listdir(unmatched_path)
+                    Parallel(n_jobs=args.nodes)(delayed(cat.make_unmatched_catalog)(p, paste_dir, unmatched_path=unmatched_path, spectral_name=spectral_names[i]) for p in tqdm(range(len(paste_dir))))
+
+
+        if args.unmatched == True:
+            spectral_path = params.spectral_path
+            spectral_names = params.spectral_names
+            spectral_surveys = params.spectral_surveys
+            vignet = params.vignet
+
+
+            cat = MakeCatalogs(args.survey, bands, temp_path, output_name, output_path)
+
+            for i in range(len(spectral_names)):
+                cat.make_survey_catalog(spectral_path, spectral_names[i])
+
+                matched_path, unmatched_path = params.matched_path, params.unmatched_path
+                paste_dir = os.listdir(unmatched_path)
+                Parallel(n_jobs=args.nodes)(delayed(cat.match_unmatched_catalog)(p, paste_dir, unmatched_path=unmatched_path, spectral_name=spectral_names[i]) for p in tqdm(range(len(paste_dir))))
+                
+                # for p in tqdm(range(len(paste_dir))):
+                #     cat.match_unmatched_catalog(p, paste_dir, unmatched_path=unmatched_path, spectral_name=spectral_names[i])
+
+                GenFiles = GenerateFiles(args.survey, bands, path, output_name, output_path=output_path)
+                GenFiles.make_directories(output=True)
+                vignet = params.vignet
+                cat = MakeCatalogs(args.survey, bands, temp_path, output_name, output_path)
+                cat.merge_catalogs(vignet=False, d2d = True, unmatched=False, matched=True)
+
+                GenPlot = GeneratePlots(args.survey, bands, temp_path, output_name=output_name, spectral_names=spectral_names[i], output_path=output_path)
+                GenPlot.plot_d2d()
 
         #------------------------------------------------------------------#
         # # # # # JOIN INDIVIDUAL TILE CATALOGS # # # # #
         #------------------------------------------------------------------#
 
         if args.join == True:
+            GenFiles = GenerateFiles(args.survey, bands, path, output_name, output_path=output_path)
+            GenFiles.make_directories(output=True)
             vignet = params.vignet
             cat = MakeCatalogs(args.survey, bands, temp_path, output_name, output_path)
             cat.merge_catalogs(vignet=vignet)
@@ -130,12 +177,25 @@ if __name__ == "__main__":
             GenPlot = GeneratePlots(args.survey, bands, temp_path, output_name=output_name, spectral_names=spectral_names, output_path=output_path)
             GenPlot.plot_matched_z_spec_hist()
             GenPlot.plot_unmatched_z_spec_hist()
+            print("Successfully plotted redshift distributions")
 
         #------------------------------------------------------------------#
         # # # # # MACHINE LEARNING ALGORITHMS # # # # #
         #------------------------------------------------------------------#
 
         if args.learning == True:
+
+            if args.preprocess is None:
+                warnings.simplefilter("always")
+                warnings.warn("No preprocess method was given, 'drop' method will be used")
+                args.preprocess = 'drop'
+
+            if args.algorithm is None:
+                warnings.simplefilter("always")
+                warnings.warn("No ML method was given, 'RF' will be used")
+                args.algorithm = 'RF'
+
+            warnings.filterwarnings('ignore')
 
             GenFiles = GenerateFiles(args.survey, bands, path, output_name, output_path=output_path)
             GenFiles.make_directories(output=True)
@@ -153,7 +213,7 @@ if __name__ == "__main__":
                 if args.survey == 'ps3pi_cfis':
                     path_to_csv = output_path + 'output/' + args.survey  + '/' + output_name + '/files/' + output_name + '.csv'
                     ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name, output_path=output_path, cv=cv, preprocessing=args.preprocess, n_jobs=args.nodes)
-                    df, df_unmatched = ML.merge_cfis_r_cfht_u_medium_deep_i_g_z()
+                    df, df_unmatched = ML.merge_cfis_r_cfht_u_medium_deep_i_g_z(morphology = params.morphological_parameters)
                     if feature_engineering == True:
                         # df_list = ML.feature_engineering(df, bands=['r', 'u', 'i', 'z', 'g'])
                         df_list = ML.feature_engineering(df, bands=['r', 'u', 'i', 'z', 'g'], color_order=['i', 'g' , 'r', 'z', 'u'])
@@ -163,18 +223,23 @@ if __name__ == "__main__":
                     if plot == True:
                         ML.plot_corrmat(df)
                         GenPlot = GeneratePlots(args.survey, bands, temp_path, output_name=output_name, output_path=output_path, spectral_names=spectral_names)
-                        # GenPlot.plot_mags(df, df_unmatched)
+                        GenPlot.plot_mags(df, df_unmatched, bands=['r', 'u', 'i', 'z', 'g'])
 
                 elif args.survey == 'unions':
                     path_to_csv = output_path + 'output/' + args.survey  + '/' + output_name + '/files/' + output_name + '.csv'
                     ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name, output_path=output_path, cv=cv, preprocessing=args.preprocess, n_jobs=args.nodes)
                     df = ML.dataframe()
-                    df_unmatched = ML.unmatched_dataframe()
-                    df = ML.gal_g()
+                    df_unmatched = ML.rename_unmatched_dataframe()
+                    df = ML.rename_matched_dataframe(morph=False)
+                    if feature_engineering == True:
+                        # df_list = ML.feature_engineering(df, bands=['r', 'u', 'i', 'z', 'g'])
+                        df_list = ML.feature_engineering(df, bands=['r', 'u', 'i', 'z'])
+                    else:
+                        df_list = [df]
                     if plot == True:
                         ML.plot_corrmat(df)
                         GenPlot = GeneratePlots(args.survey, bands, temp_path, output_name=output_name, output_path=output_path, spectral_names=spectral_names)
-                        GenPlot.plot_mags(df, df_unmatched)
+                        GenPlot.plot_mags(df, df_unmatched, bands=['r', 'u', 'i', 'z'])
                 else:
                     raise TypeError("--survey needs to be set to 'unions' or 'ps3pi_cfis', please specify the full path to your DataFrame")
 
@@ -188,14 +253,18 @@ if __name__ == "__main__":
          
             if args.algorithm == 'BEST':
 
-                algs = {'RF': RandomForest, 'ANN': ArtificialNeuralNetwork, 'SVR': SupportVectorRegression, 'GBR': GradientBoostingRegression}
+                algs = {'RF': RandomForest, 'SVR': SupportVectorRegression, 'GBR': GradientBoostingRegression}
 
                 best_score = 1
                 best_alg = 'none'
                 # alg_names = np.array(list(algs.items()))[:,1]
                 if weights == True:
                     cat = MakeCatalogs(args.survey, bands, temp_path, output_name, output_path)
-                    weights = cat.compute_weights(df, column = 'r')
+                    if args.survey == 'ps3pi_cfis':
+                        column = 'r'
+                    elif args.survey == 'unions':
+                        column = None
+                    weights = cat.compute_weights(df, column=column)
                 elif type(weights) == str:
                     weights = np.load(weights)
                 else:
@@ -214,7 +283,7 @@ if __name__ == "__main__":
                         
                     for df in df_list:
                         method = alg(survey = args.survey, bands = bands, output_name = output_name, temp_path=temp_path, dataframe=df, path_to_csv=None, validation_set=False, output_path=output_path, sample_weight=weights, cv=cv, preprocessing=args.preprocess, n_jobs=args.nodes)
-                        score = method.score()
+                        score = method.score(df)
                         print(list(df.columns))
                         print('[preprocess] %s'%score[4])
                         print('[%s '%alg_name +'score] {:.3f} ± {:.3f}'.format(score[5], score[6]))
@@ -235,7 +304,7 @@ if __name__ == "__main__":
                         
                         break
                     
-                    best_dict.to_cs(path + 'output/%s/%s/files/'%(args.survey, output_name) + 'Best_scores_' + output_name + '.csv', index=False)
+                    best_dict.to_csv(path + 'output/%s/%s/files/'%(args.survey, output_name) + 'Best_scores_' + output_name + '.csv', index=False)
                     # score = method.score()
                     
                     print('---------------------------------------------------------------')
@@ -282,7 +351,11 @@ if __name__ == "__main__":
 
                 if weights == True:
                     cat = MakeCatalogs(args.survey, bands, temp_path, output_name, output_path)
-                    weights = cat.compute_weights(df, column = 'r')
+                    if args.survey == 'ps3pi_cfis':
+                        column = 'r'
+                    elif args.survey == 'unions':
+                        column = None
+                    weights = cat.compute_weights(df, column=column)
                 elif type(weights) == str:
                     weights = np.load(weights)
                 else:
@@ -358,7 +431,11 @@ if __name__ == "__main__":
 
                 if weights == True:
                     cat = MakeCatalogs(args.survey, bands, temp_path, output_name, output_path)
-                    weights = cat.compute_weights(df_best, column = 'r')
+                    if args.survey == 'ps3pi_cfis':
+                        column = 'r'
+                    elif args.survey == 'unions':
+                        column = None
+                    weights = cat.compute_weights(df_best, column=column)
                 elif type(weights) == str:
                     weights = np.load(weights)
                 else:
