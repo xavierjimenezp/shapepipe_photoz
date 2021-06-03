@@ -518,7 +518,7 @@ if __name__ == "__main__":
         # output_name = 'CFIS_matched_SDSS_2_catalog_RUIZ'
         output_path = path
 
-        temp_path = '/n17data/jimenez/temp/'
+        temp_path = './temp/'
 
         bands = ['R', 'U', 'I', 'Z']
 

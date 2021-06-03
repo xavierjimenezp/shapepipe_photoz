@@ -16,6 +16,7 @@ import numpy as np
 import os
 import shutil
 import glob
+import errno
 from numpy.compat.py3k import contextlib_nullcontext
 import pandas as pd
 import importlib
@@ -99,9 +100,14 @@ class GenerateFiles(object):
         """
 
         try:
-            os.mkdir(path_to_file)
-        except OSError:
-            pass
+            os.makedirs(str(path_to_file))
+        except OSError as exc:
+            if exc.errno == errno.EEXIST:
+                pass
+            else:
+                raise
+        except:
+            raise
         else:
             print ("Successfully created the directory %s " % path_to_file)
 
@@ -166,7 +172,7 @@ class GenerateFiles(object):
                     self.remove_files_from_directory(self.temp_path + self.survey + directory)
                     print("Successfully removed the directory %s " % (self.temp_path + self.survey + directory))
         else:
-            print("Directory %s does not exists"%(self.temp_path + self.survey))
+            print("Directory %s does not exist"%(self.temp_path + self.survey))
 
 
     def is_directory_empty(self, path_to_dir):
