@@ -105,7 +105,6 @@ if __name__ == "__main__":
 
                 matched_path, unmatched_path = params.matched_path, params.unmatched_path
                 paste_dir = os.listdir(matched_path)
-                print('MKDEBUG paste_dir ', paste_dir)
                 Parallel(n_jobs=args.nodes)(delayed(cat.make_matched_catalog)(p, paste_dir, matched_path=matched_path, spectral_name=spectral_names[i], vignet=vignet) for p in tqdm(range(len(paste_dir))))
                 paste_dir = os.listdir(unmatched_path)
                 Parallel(n_jobs=args.nodes)(delayed(cat.make_unmatched_catalog)(p, paste_dir, unmatched_path=unmatched_path, spectral_name=spectral_names[i]) for p in tqdm(range(len(paste_dir))))
