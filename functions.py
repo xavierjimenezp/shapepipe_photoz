@@ -27,7 +27,7 @@ import seaborn as sns
 # from sklearn import kernel_ridge
 # from sklearn.utils import validation
 style.use('seaborn-poster') #sets the size of the charts
-style.use('ggplot')
+#style.use('ggplot')
 from matplotlib.colors import LogNorm
 
 import astropy.units as u
