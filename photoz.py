@@ -103,30 +103,11 @@ if __name__ == "__main__":
             for i in range(len(spectral_names)):
                 cat.make_survey_catalog(spectral_path, spectral_names[i])
 
-                try: ## Compatibility for using input_path=str or None
-                    input_path = params.input_path
-                    warnings.simplefilter("always")
-                    warnings.warn("'input_path' param is deprecated, please use 'matched_path'/'unmatched_path' instead", DeprecationWarning)
-
-                    if input_path == None:
-                        path_to_tile_run = params.path_to_tile_run
-                        out_dir = os.listdir(path_to_tile_run + args.survey + '/%s/output/'%(spectral_surveys[i]))[-1]
-                        warnings.simplefilter("always")
-                        warnings.warn("'input_path = None' is deprecated, please use 'matched_path'/'unmatched_path' instead", DeprecationWarning)
-                        input_path = path_to_tile_run + args.survey + '/%s/output/%s/paste_cat_runner/output/'%(spectral_surveys[i], out_dir)
-
-                    else:
-                        input_path = params.input_path
-
-                    paste_dir = os.listdir(input_path)
-                    Parallel(n_jobs=args.nodes)(delayed(cat.make_catalog)(p, paste_dir, matched_path=input_path, unmatched_path=input_path, spectral_name=spectral_names[i], vignet=vignet) for p in tqdm(range(len(paste_dir))))
-
-                except: #Up to date version
-                    matched_path, unmatched_path = params.matched_path, params.unmatched_path
-                    paste_dir = os.listdir(matched_path)
-                    Parallel(n_jobs=args.nodes)(delayed(cat.make_matched_catalog)(p, paste_dir, matched_path=matched_path, spectral_name=spectral_names[i], vignet=vignet) for p in tqdm(range(len(paste_dir))))
-                    paste_dir = os.listdir(unmatched_path)
-                    Parallel(n_jobs=args.nodes)(delayed(cat.make_unmatched_catalog)(p, paste_dir, unmatched_path=unmatched_path, spectral_name=spectral_names[i]) for p in tqdm(range(len(paste_dir))))
+                matched_path, unmatched_path = params.matched_path, params.unmatched_path
+                paste_dir = os.listdir(matched_path)
+                Parallel(n_jobs=args.nodes)(delayed(cat.make_matched_catalog)(p, paste_dir, matched_path=matched_path, spectral_name=spectral_names[i], vignet=vignet) for p in tqdm(range(len(paste_dir))))
+                paste_dir = os.listdir(unmatched_path)
+                Parallel(n_jobs=args.nodes)(delayed(cat.make_unmatched_catalog)(p, paste_dir, unmatched_path=unmatched_path, spectral_name=spectral_names[i]) for p in tqdm(range(len(paste_dir))))
 
 
         if args.unmatched == True:
