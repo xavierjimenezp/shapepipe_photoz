@@ -26,10 +26,11 @@ temp_path = path + 'temp/'
 # # # # # PREPROCESSING PARAMS # # # # #
 #------------------------------------------------------------------#
 
-spectral_path = '/n17data/jimenez/spectral_catalogs/'
+catalog_path = 'catalogs/'
+spectral_path = catalog_path
 spectral_names = ['alldeep.egs.uniq.2012jun13']
-matched_path = '/n17data/jimenez/shaperun/ps3pi_cfis/deep23/output/run_sp_PcM_2021-03-01_19-30-24/paste_cat_runner/output/'
-unmatched_path = '/n17data/jimenez/shaperun/ps3pi_cfis/deep23/output/run_sp_PcD_2021-03-01_18-08-31/paste_cat_runner/output/'
+matched_path = f'{catalog_path}/matched/'
+unmatched_path = f'{catalog_path}/unmatched/'
 spectral_surveys = ['deep23']
 vignet = False
 
@@ -39,7 +40,6 @@ vignet = False
 
 max_evals = 50
 path_to_csv = None
-#weights = path + 'output/ps3pi_cfis/'+output_name+'/files/' + 'Weights_' + output_name + '.npy'
 weights = True
 cv = 4
 feature_engineering = True
