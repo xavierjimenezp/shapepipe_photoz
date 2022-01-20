@@ -517,7 +517,6 @@ if __name__ == "__main__":
 
         elif args.make == True:
             cat = MakeCatalogs(args.survey, bands, temp_path)
-            # vignet = [False, False, False, False, False]
             for i in range(len(spectral_names)):
                 cat.make_survey_catalog(spectral_path, spectral_names[i])
                 out_dir = os.listdir("/n17data/jimenez/shaperun_unions/output_%s/"%(spectral_surveys[i]))[-1]
