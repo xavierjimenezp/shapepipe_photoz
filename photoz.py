@@ -193,6 +193,9 @@ if __name__ == "__main__":
             if path_to_csv is None:
                 if args.survey == 'ps3pi_cfis':
                     path_to_csv = output_path + 'output/' + args.survey  + '/' + output_name + '/files/' + output_name + '.csv'
+                    print('MKDEBUG ', args.survey, bands, path_to_csv, output_name, output_path, cv, args.preprocess, args.nodes)
+                    import sys
+                    sys.exit(0)
                     ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name, output_path=output_path, cv=cv, preprocessing=args.preprocess, n_jobs=args.nodes)
                     df, df_unmatched = ML.merge_cfis_r_cfht_u_medium_deep_i_g_z(morphology = params.morphological_parameters)
                     if feature_engineering == True:

@@ -1644,7 +1644,8 @@ class LearningAlgorithms(object):
             plt.close()           
 
 
-    def plot_zphot_zspec(self, y_pred, y_test, method, lim):
+    def plot_zphot_zspec(self, y_pred, y_test, method, lim, y_max=None, xy_min=None):
+
         fig = plt.figure(figsize=(7,6), tight_layout=False)
         ax = fig.add_subplot(111)
         ax.set_facecolor('white')
@@ -1655,8 +1656,16 @@ class LearningAlgorithms(object):
         # ax.set_title('%s'%method, fontsize=15)
 
         im = ax.hist2d([float(y) for y in y_test], [float(y) for y in y_pred], bins=(50, 50), cmap='gist_yarg')
-        ax.set_xlim([np.amin(y_test), lim])
-        ax.set_ylim([np.amin(y_pred), np.amax(y_pred)])
+        if not xy_min:
+            x_min = np.amin(y_test)
+            y_min = np.amin(y_pred)
+        else:
+            x_min = xy_min
+            y_min = xy_min
+        if not y_max:
+            y_max = np.amax(y_pred)
+        ax.set_xlim([x_min, lim])
+        ax.set_ylim([y_min, y_max])
         cbar = fig.colorbar(im[3])
 
         sigma, eta = self.sigma_eta(y_test, y_pred)
