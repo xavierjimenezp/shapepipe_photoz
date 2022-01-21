@@ -1645,7 +1645,6 @@ class LearningAlgorithms(object):
 
 
     def plot_zphot_zspec(self, y_pred, y_test, method, lim, y_max=None, xy_min=None):
-
         fig = plt.figure(figsize=(7,6), tight_layout=False)
         ax = fig.add_subplot(111)
         ax.set_facecolor('white')
@@ -1675,6 +1674,7 @@ class LearningAlgorithms(object):
         x = np.linspace(0, 3.5, 1000)
         ax.plot(x,x, linewidth=1, color='k', linestyle='--')
         plt.savefig(self.output_path + 'figures/' + self.output_name + '_' + method + '_zphot_zspec' + '.pdf', bbox_inches='tight', transparent=True)
+
         plt.show()
         plt.close()
 
@@ -1825,7 +1825,10 @@ class LearningAlgorithms(object):
         else:
             df = dataframe.sample(frac=1).reset_index(drop=True)
 
+        # Get all but last column
         X = df.iloc[:,:-1]
+
+        # Get last column
         y = df.iloc[:,-1]
 
         df_X_list = []
