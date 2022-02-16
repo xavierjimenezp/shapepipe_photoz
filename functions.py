@@ -24,10 +24,7 @@ import matplotlib.pyplot as plt
 import matplotlib.style as style
 from pandas.core.base import NoNewAttributesMixin
 import seaborn as sns
-# from sklearn import kernel_ridge
-# from sklearn.utils import validation
 style.use('seaborn-poster') #sets the size of the charts
-#style.use('ggplot')
 from matplotlib.colors import LogNorm
 
 import astropy.units as u
@@ -57,7 +54,6 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.base import BaseEstimator, TransformerMixin, RegressorMixin, clone
 from sklearn.model_selection import KFold, cross_val_score, train_test_split
 from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import train_test_split
 import xgboost as xgb
 import lightgbm as lgb
 from sklearn.svm import SVR
@@ -563,45 +559,6 @@ class MakeCatalogs(object):
         df_to_cut.drop(columns=['isdup'], inplace=True)
 
         #------------------------------------------------------------------#
-        # # # # # Spatial coordinates matching # # # # #
-        #------------------------------------------------------------------#
-        # if self.survey == 'unions':
-
-        #     scatalog_sub = SkyCoord(ra=df_to_cut['RA'].values, dec=df_to_cut['DEC'].values, unit='deg')
-        #     pcatalog_sub = SkyCoord(ra=df_Z['RA'].values, dec=df_Z['DEC'].values, unit='deg')
-        #     idx, d2d, _ = match_coordinates_sky(scatalog_sub, pcatalog_sub, nthneighbor=1)
-
-        #     tol = 0.3*u.arcsecond #threshold to consider whether or not two galaxies are the same
-        #     ismatched = d2d < tol
-
-        #     # try:
-
-        #     #------------------------------------------------------------------#
-        #     # # # # # Create matched dataframe with redshift # # # # #
-        #     #------------------------------------------------------------------#
-
-        #     df_d2d = pd.DataFrame(data={'ismatched': ismatched, 'idx': idx, 'd2d': d2d, 'RA': df_to_cut['RA'].values,'DEC':df_to_cut['DEC'].values})
-        #     df_d2d.query("ismatched == True", inplace=True)
-        #     df_d2d.drop(columns=['ismatched'], inplace=True)
-
-        
-        #     try:
-        #         idx_sub = np.array([(i,ide) for (i,ide) in enumerate(idx) if ismatched[i] == True])[:,1]
-        #     except:
-        #         print('0 matched objects wo filters for tile %s'%(file_name[:-5]+'_'+spectral_name))
-        #         return
-
-        #     z_spec_sub = []
-        #     for i in idx_sub:
-        #         z_spec_sub.append(df_Z['Z_SPEC'].values[i])
-        #     z_spec_sub = np.array(z_spec_sub)
-
-        #     df_to_cut['ismatched'] = ismatched
-        #     df_to_cut.query("ismatched == True", inplace=True)
-        #     df_to_cut.drop(columns=['ismatched'], inplace=True)
-        #     df_to_cut['Z_SPEC'] = z_spec_sub
-
-        #------------------------------------------------------------------#
         # # # # # Band extraction for dataframe # # # # #
         #------------------------------------------------------------------#
 
@@ -610,8 +567,6 @@ class MakeCatalogs(object):
         MAG_ZEROPOINT_NAMES = np.array(['MAG_AUTO_%s'%band for band in self._bands[1:]])
         MAG_NAMES = ['MAG_AUTO', 'MAG_WIN']
         MAG_COLS = np.array(['%s_%s'%(param, band) for param in MAG_NAMES for band in self._bands[1:]])
-
-
 
         # try:
         try:
@@ -632,7 +587,6 @@ class MakeCatalogs(object):
         df_mag.insert(0, 'NAME', NAME)   
 
 
-
         # if self.survey == 'ps3pi_cfis':
         df_mag['Z_SPEC'] = HDU_tile['R'].data['Z'].tolist()
         df_mag['id'] = HDU_tile[self._bands[0]].data['NUMBER'].tolist()
@@ -644,30 +598,12 @@ class MakeCatalogs(object):
         morpho_par = [HDU_tile['R_PSF'].data[param].tolist() for param in MORPHO_NAMES]
         df_morph = pd.DataFrame(data = dict(zip(MORPHO_NAMES, morpho_par)))
 
-        # mv = LearningAlgorithms.missing_data(self, df_morph)
-        # print(mv.head(10))
-        
         dfbands = pd.merge(df_mag, df_morph, indicator=True, on='id', how='outer').query('_merge=="both"').drop('_merge', axis=1)
         dfbands.drop(columns=['id'], inplace=True)
         
         dfbands_matched = dfbands.copy()
         dfbands_matched = dfbands_matched[dfbands_matched['Z_SPEC'].notna()]
         dfbands_unmatched = df_mag.copy()
-
-        # if self.survey == 'unions':
-        #     dfbands = df_mag.copy()
-        #     dfbands['ID'] = np.arange(0,len(dfbands),1).tolist()
-        #     ## merge
-        #     dfbands_matched = pd.merge(dfbands, df_to_cut, indicator=True, on='ID', how='left').query('_merge=="both"').drop('_merge', axis=1)
-        #     df_unmatched = df_to_cut.copy()
-        #     dfbands_unmatched = pd.merge(dfbands, df_unmatched, indicator=True, on='ID', how='left').query('_merge=="both"').drop('_merge', axis=1)
-
-
-
-
-        # if self.survey == 'ps3pi_cfis':
-        # print(np.corrcoef(dfbands_matched['FWHM'], dfbands_matched['gal_sigma']))
-
 
         # replace 99 by np.nan in MAG cols (TO DO: replace whatever equivalent there is for FLUX cols)
         for col in MAG_COLS:
@@ -685,11 +621,6 @@ class MakeCatalogs(object):
             dfbands_matched.drop(columns=['SNR_WIN_%s'%band, 'FWHM_WORLD_%s'%band], inplace=True)
             dfbands_unmatched.drop(columns=['SNR_WIN_%s'%band, 'FWHM_WORLD_%s'%band], inplace=True)
 
-        # keep only mags with err<0.5
-        # for name in MAGERR_NAMES:
-            # dfbands_matched.query("%s < 0.5"%name, inplace=True)
-            # dfbands_unmatched.query("%s < 0.5"%name, inplace=True)
-
         # shift -5 mag
         if self.survey == 'ps3pi_cfis':
             for name in MAG_ZEROPOINT_NAMES:
@@ -702,10 +633,6 @@ class MakeCatalogs(object):
             self.vignet_to_array(file_name, dfbands_matched, HDU_tile)
 
 
-        # print(np.corrcoef(dfbands_matched['MAG_AUTO_R'], dfbands_matched['Z_SPEC']))
-
-        # print('%i/%i matched objects w filters for tile %s'%(len(dfbands_matched), np.shape(par)[1], file_name[:-5]+'_'+spectral_name))
-
         dfbands_matched.drop(columns=['ID'], inplace=True)
         dfbands_matched.to_csv(self.temp_path + self.survey + '/matched/'+'%s'%file_name[:-5]+'_'+spectral_name+'.csv', index=False)
         dfbands_unmatched.drop(columns=['ID'], inplace=True)
@@ -714,23 +641,6 @@ class MakeCatalogs(object):
         df_Z.to_csv(self.temp_path + self.survey + '/redshift/'+'%s'%file_name[:-5]+'_'+spectral_name+'.csv', index=False)
 
         dfbands_matched.query("Z_SPEC > 0", inplace=True)
-
-        # df_d2d.to_csv(self.temp_path + self.survey + '/d2d/'+'%s'%file_name[:-5]+'_'+spectral_name+'.csv', index=False)
-
-        #     except:
-        #         print('Tile %s does not have the right number of bands'%(file_name[:-5]+'_'+spectral_name))
-
-        # except:
-        #     print('0 matched objects for tile %s'%(file_name[:-5]+'_'+spectral_name))
-
-
-
-            # print('Tile %s does not have the right number of bands'%(file_name[:-5]+'_'+spectral_name))
-        # except:
-        #     print('Tile %s did not match any spectral galaxy'%(file_name[:-5]+'_'+spectral_name))
-
-
-
 
 
     def match_unmatched_catalog(self, p, paste_dir, unmatched_path, spectral_name):
@@ -814,9 +724,6 @@ class MakeCatalogs(object):
         #------------------------------------------------------------------#
 
         df_d2d = pd.DataFrame(data={'ismatched': ismatched, 'idx': idx, 'd2d': d2d, 'RA': df_to_cut['RA'].values,'DEC':df_to_cut['DEC'].values})
-        # df_d2d.query("ismatched == True", inplace=True)
-        # df_d2d.drop(columns=['ismatched'], inplace=True)
-
     
         try:
             idx_sub = np.array([(i,ide) for (i,ide) in enumerate(idx) if ismatched[i] == True])[:,1]
@@ -868,21 +775,6 @@ class MakeCatalogs(object):
         dfbands_matched = pd.merge(df_mag, df_to_cut, indicator=True, on='ID', how='outer').query('_merge=="both"').drop('_merge', axis=1)
         
 
-        # if self.survey == 'unions':
-        #     dfbands = df_mag.copy()
-        #     dfbands['ID'] = np.arange(0,len(dfbands),1).tolist()
-        #     ## merge
-        #     dfbands_matched = pd.merge(dfbands, df_to_cut, indicator=True, on='ID', how='left').query('_merge=="both"').drop('_merge', axis=1)
-        #     df_unmatched = df_to_cut.copy()
-        #     dfbands_unmatched = pd.merge(dfbands, df_unmatched, indicator=True, on='ID', how='left').query('_merge=="both"').drop('_merge', axis=1)
-
-
-
-
-        # if self.survey == 'ps3pi_cfis':
-        # print(np.corrcoef(dfbands_matched['FWHM'], dfbands_matched['gal_sigma']))
-
-
         # replace 99 by np.nan in MAG cols (TO DO: replace whatever equivalent there is for FLUX cols)
         for col in MAG_COLS:
             dfbands_matched.loc[(dfbands_matched[col]>98), col] = np.nan
@@ -894,11 +786,6 @@ class MakeCatalogs(object):
                 dfbands_matched.query("SNR_WIN_%s > 10 & FWHM_WORLD_%s*3600 > 0.8 & MAGERR_AUTO_%s < 0.5" %(band,band,band) , inplace=True)                
         for band in self._bands:
             dfbands_matched.drop(columns=['SNR_WIN_%s'%band, 'FWHM_WORLD_%s'%band], inplace=True)
-
-        # keep only mags with err<0.5
-        # for name in MAGERR_NAMES:
-            # dfbands_matched.query("%s < 0.5"%name, inplace=True)
-            # dfbands_unmatched.query("%s < 0.5"%name, inplace=True)
 
         # shift -5 mag
         if self.survey == 'ps3pi_cfis':
@@ -915,9 +802,6 @@ class MakeCatalogs(object):
 
         df_Z.to_csv(self.temp_path + self.survey + '/redshift/'+'%s'%file_name[:-5]+'_'+spectral_name+'.csv', index=False)
         df_d2d.to_csv(self.temp_path + self.survey + '/d2d/'+'%s'%file_name[:-5]+'_'+spectral_name+'.csv', index=False)
-
-
-
 
 
     def make_matched_catalog(self, p, paste_dir, matched_path, spectral_name, vignet=True):
@@ -1022,9 +906,6 @@ class MakeCatalogs(object):
         morpho_par = [HDU_tile['R_PSF'].data[param].tolist() for param in MORPHO_NAMES]
         df_morph = pd.DataFrame(data = dict(zip(MORPHO_NAMES, morpho_par)))
 
-        # mv = LearningAlgorithms.missing_data(self, df_morph)
-        # print(mv.head(10))
-        
         dfbands = pd.merge(df_mag, df_morph, indicator=True, on='id', how='outer').query('_merge=="both"').drop('_merge', axis=1)
         dfbands.drop(columns=['id'], inplace=True)
         
@@ -1416,10 +1297,7 @@ class LearningAlgorithms(object):
             else:
                 self.df = dataframe
         elif path_to_csv is not None:
-            # try:
             self.df = pd.read_csv(path_to_csv)
-            # except:
-                # raise TypeError('neither path_to_csv nor dataframe were specified')
         if output_path is None:
             self.output_path = self._path + 'output/' + self.survey + '/' + self.output_name + '/'       
         else:
@@ -1490,9 +1368,6 @@ class LearningAlgorithms(object):
         CFHT = pd.read_csv(self._path+'catalogs/CFHTLens_2021-01-25T12_32_19.tsv', delimiter='\t')
         CFHT = CFHT.replace(-99, 0)
         CFHT = CFHT.replace(99, 0)
-        # CFHT['MAG_i'] = CFHT['MAG_i'] + CFHT['MAG_y']
-        # CFHT['MAGERR_i'] = CFHT['MAGERR_i'] + CFHT['MAGERR_y']
-        # CFHT['EXTINCTION_i'] = CFHT['EXTINCTION_i'] + CFHT['EXTINCTION_y']
         CFHT = CFHT.replace(0, np.nan)
         CFHT.query("MAGERR_u < 0.5", inplace=True)
         CFHT.rename(columns={"ALPHA_J2000": "RA", "DELTA_J2000": "DEC"}, inplace=True)
@@ -1652,11 +1527,7 @@ class LearningAlgorithms(object):
         ax.set_xlabel(r'$\mathrm{z}_{\mathrm{spec}}$', fontsize=20)
         ax.set_ylabel(r'$\mathrm{z}_{\mathrm{phot}}$', fontsize=20)
 
-        # ax.set_title('%s'%method, fontsize=15)
-
         im = ax.hist2d([float(y) for y in y_test], [float(y) for y in y_pred], bins=(nbins, nbins), cmap='gist_yarg')
-        #ax.set_xlim([np.amin(y_test), lim])
-        #ax.set_ylim([np.amin(y_pred), np.amax(y_pred)])
         ax.set_xlim([0, lim])
         ax.set_ylim([0, lim])
         cbar = fig.colorbar(im[3])
@@ -1799,8 +1670,6 @@ class LearningAlgorithms(object):
         
         return dataframe
 
-
-
     def cross_validation(self, model, params={}, metric=False, scaler=False, linear=False, ann=False, dataframe=pd.DataFrame(data={})):
         """[summary]
 
@@ -1876,11 +1745,13 @@ class LearningAlgorithms(object):
                 X_test = sc_X.transform(X_test)
             if ann == True:
                 regressor = model
+                print('MKDEBUG ann fit')
                 regressor.fit(X_train, y_train, batch_size = 32, epochs = 100, verbose=0, sample_weight=weight_train)
             else:
                 if linear == True:
                     regressor = make_pipeline(RobustScaler(), model(**params))
                     kwargs = {regressor.steps[-1][0] + '__sample_weight': weight_train}
+                    print('MKDEBUG linear fit')
                     regressor.fit(X_train, y_train, **kwargs)
                 elif linear == False:
                     regressor = model(**params)
@@ -2187,6 +2058,12 @@ class RandomForest(LearningAlgorithms):
         regressor = RandomForestRegressor(**self.params)
 
         return LearningAlgorithms.pmodel(self, regressor)
+
+    def predict(self):
+
+        regressor = RandomForestRegressor(**self.params)
+
+        return regressor.predict
 
     def filter(self):
         df = self.feature_remover(model=RandomForestRegressor, dataframe=self.df, params=self.params, metric=False, scaler=False, linear=False, ann=False)
