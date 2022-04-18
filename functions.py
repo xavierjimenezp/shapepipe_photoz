@@ -58,7 +58,6 @@ import xgboost as xgb
 import lightgbm as lgb
 from sklearn.svm import SVR
 
-
 #------------------------------------------------------------------#
 # # # # # Functions # # # # #
 #------------------------------------------------------------------#
@@ -1270,10 +1269,6 @@ class MakeCatalogs(object):
 
         return weight
 
-
-
-
-
 class LearningAlgorithms(object):
 
     def __init__(self, survey, bands, output_name, output_path=None, temp_path=None, path_to_csv=None, dataframe=pd.DataFrame(data={}), sample_weight=None, validation_set=False, cv=4, preprocessing='drop', n_jobs=-1):
@@ -1549,7 +1544,7 @@ class LearningAlgorithms(object):
         sigma = 1.4826*np.median( np.abs( delta_z - np.median(delta_z) ) )
         outlier = np.abs(delta_z) > 0.15
         outlier_rate = len([x for x in outlier.ravel() if x==True])/len(delta_z.ravel())
-        return np.sqrt(np.mean(delta_z)**2 + sigma**2)
+        return np.sqrt(np.mean(delta_z)**2 + sigma**2), outlier_rate
 
 
 
@@ -1745,13 +1740,11 @@ class LearningAlgorithms(object):
                 X_test = sc_X.transform(X_test)
             if ann == True:
                 regressor = model
-                print('MKDEBUG ann fit')
                 regressor.fit(X_train, y_train, batch_size = 32, epochs = 100, verbose=0, sample_weight=weight_train)
             else:
                 if linear == True:
                     regressor = make_pipeline(RobustScaler(), model(**params))
                     kwargs = {regressor.steps[-1][0] + '__sample_weight': weight_train}
-                    print('MKDEBUG linear fit')
                     regressor.fit(X_train, y_train, **kwargs)
                 elif linear == False:
                     regressor = model(**params)
@@ -1982,9 +1975,6 @@ class LearningAlgorithms(object):
         score_df.to_csv(self.output_path + 'files/' + 'Best_improv_morph_' + self.output_name + '_' + self.method + '.csv', index=False)
         print(score_df.head(10))
         
-
-
-
     def pmodel(self, regressor, train=None, test=None, weight_train=None, scaler=False, linear=False, ann=False, preprocess_method=None):
 
         if test is None and train is None:
@@ -2006,7 +1996,6 @@ class LearningAlgorithms(object):
 
         if preprocess_method == 'BEST':
             pass
-        # elif preprocess_method is not None and preprocess_method != 'BEST':
         else:
             if weight_train is None:
                 train, test, sample_weight_train, best_method = self.preprocess(regressor, train, test, self.sample_weight_train, method=self.preprocessing)
@@ -2059,11 +2048,11 @@ class RandomForest(LearningAlgorithms):
 
         return LearningAlgorithms.pmodel(self, regressor)
 
-    def predict(self):
+    def predict(self, X):
 
-        regressor = RandomForestRegressor(**self.params)
+        regressor = self.model()[0]
 
-        return regressor.predict
+        return regressor.predict(X)
 
     def filter(self):
         df = self.feature_remover(model=RandomForestRegressor, dataframe=self.df, params=self.params, metric=False, scaler=False, linear=False, ann=False)
@@ -2539,14 +2528,12 @@ class Optimizer(LearningAlgorithms):
     def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
         super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, preprocessing=preprocessing, n_jobs=n_jobs)
     
-    
     def sigma_eta_score(self, y_test, y_pred):
         delta_z = (y_test - y_pred)/(np.ones_like(y_test) + y_test)
         sigma = 1.4826*np.median( np.abs( delta_z - np.median(delta_z) ) )
         outlier = np.abs(delta_z) > 0.15
         outlier_rate = len([x for x in outlier.ravel() if x==True])/len(delta_z.ravel())
-        return np.sqrt(np.mean(delta_z)**2 + sigma**2)
-
+        return np.sqrt(np.mean(delta_z)**2 + sigma**2), outlier_rate
 
     def cross_validation(self, metric, model, scaler=False, linear=False, ann=False):
         """[summary]
@@ -2645,11 +2632,6 @@ class RandomForestOptimizer(Optimizer):
         mss=int(params['min_samples_split'])
         cri=params['criterion']
         params = {'n_estimators':est,'max_depth':md,'min_samples_leaf':msl,'min_samples_split':mss, 'criterion':cri, 'n_jobs':-1}
-
-        # model=RandomForestRegressor(n_estimators=est,max_depth=md,min_samples_leaf=msl,min_samples_split=mss, criterion=cri)
-        # model.fit(self.X_train,self.y_train)
-        # y_pred = model.predict(self.X_val)
-        # score = Optimizer.sigma_eta_score(self, self.y_val, y_pred)
 
         score =  Optimizer.cross_validation(self, model=RandomForestRegressor(**params), metric=self.sigma_eta_score)
         return score.mean()
@@ -2792,12 +2774,6 @@ class SVROptimizer(Optimizer):
         cc = params['C']
         params = {'kernel':'rbf', 'gamma':gam, 'C':cc}
 
-
-        # model = SVR(**params)
-        # model.fit(self.X_train,self.y_train)
-        # y_pred = model.predict(self.X_val)
-        # score = Optimizer.sigma_eta_score(self, self.y_val, y_pred)
-
         score =  Optimizer.cross_validation(self, model=SVR(**params), metric=self.sigma_eta_score, scaler=True)
         return score.mean()
 
@@ -2869,11 +2845,6 @@ class KRROptimizer(Optimizer):
         al= params['alpha']
         deg = params['degree']
         params = {'kernel':'polynomial', 'gamma':gam, 'alpha':al, 'degree':deg}
-
-        # model = SVR(**params)
-        # model.fit(self.X_train,self.y_train)
-        # y_pred = model.predict(self.X_val)
-        # score = Optimizer.sigma_eta_score(self, self.y_val, y_pred)
 
         score =  Optimizer.cross_validation(self, model=KernelRidge(**params), metric=self.sigma_eta_score, scaler=True)
         return score.mean()
