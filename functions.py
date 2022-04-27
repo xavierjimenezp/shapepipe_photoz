@@ -1541,6 +1541,7 @@ class LearningAlgorithms(object):
 
         x = np.linspace(0, 3.5, 1000)
         ax.plot(x,x, linewidth=1, color='k', linestyle='--')
+        ax.set_title(method)
         plt.savefig(self.output_path + 'figures/' + self.output_name + '_' + method + '_zphot_zspec' + '.pdf', bbox_inches='tight', transparent=True)
 
         plt.show()
@@ -2430,8 +2431,8 @@ class ArtificialNeuralNetwork(LearningAlgorithms):
 
 class ConvolutionalNeuralNetwork(LearningAlgorithms):
 
-    def __init__(self, survey, bands, output_name, output_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
-        super().__init__(survey, bands, output_name, output_path=output_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, preprocessing=preprocessing, n_jobs=n_jobs)
+    def __init__(self, survey, bands, output_name, output_path, temp_path, path_to_csv, dataframe, sample_weight, validation_set, cv, preprocessing, n_jobs):
+        super().__init__(survey, bands, output_name, output_path=output_path, temp_path=temp_path, path_to_csv=path_to_csv, dataframe=dataframe, sample_weight=sample_weight, validation_set=validation_set, cv=cv, preprocessing=preprocessing, n_jobs=n_jobs)
         self.X = np.load(self.output_path + 'output/' + self.survey + '/files/' + output_name + '.npy')
         self.X_train, self.X_test = train_test_split(self.X, test_size = 0.2, random_state=0)
         self.X_train, self.X_val = train_test_split(self.X_train, test_size = 0.2, random_state=0)

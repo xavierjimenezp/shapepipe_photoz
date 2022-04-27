@@ -1,12 +1,13 @@
-#!/usr/bin/env python
+
 # coding: utf-8
 
 # # Matched UNIONS 800 deg^2 + ShapePipe shear catalogue
 # Need to join using CFIS_ID.
 
-# In[3]:
+# In[ ]:
 
 
+import os
 import numpy as np
 import math
 
@@ -26,17 +27,17 @@ get_ipython().run_line_magic('matplotlib', 'inline')
 
 # ### Read matched ShapePipe shear catalogue
 
-# In[4]:
+# In[ ]:
 
 
-base_name_sp = 'shape_catalog_ngmix'
+base_name_sp = 'shape_catalog_extended_ngmix'
 
-hdu = fits.open(f'{base_name_sp}.fits')
+hdu = fits.open(f'sp_output/{base_name_sp}.fits')
 
 data = hdu[1].data
 
 
-# In[5]:
+# In[ ]:
 
 
 # Print column names
@@ -48,16 +49,16 @@ print(data_keys)
 
 # ### Spatial distribution
 
-# In[6]:
+# In[ ]:
 
 
-plt.plot(data['ra'], data['dec'], '.')
+plt.plot(data['RA'], data['Dec'], '.')
 plt.title('UNIONS-800 deg$^2$ + ShapePipe galaxies')
 plt.xlabel('RA [deg]')
 _ = plt.ylabel('DEC [deg]')
 
 
-# In[7]:
+# In[ ]:
 
 
 def millify(n):
@@ -90,7 +91,7 @@ def millify(n):
     return '{:.0f}{}'.format(n / 10**(3 * millidx), millnames[millidx])
 
 
-# In[8]:
+# In[ ]:
 
 
 ngal = len(data)
@@ -99,7 +100,7 @@ print(f'Number of galaxies = {ngal} = {millify(ngal)}')
 
 # ### Magnitude distribution (r-band)
 
-# In[9]:
+# In[ ]:
 
 
 fig, (ax) = plt.subplots(1, 1)
@@ -115,10 +116,12 @@ _ = plt.ylabel('frequency')
 
 # ### Read multi-band UNIONS catalogue
 
-# In[10]:
+# In[ ]:
 
 
 # UNIONS
+
+data_dir = f'{os.environ["HOME"]}/astro/data/CFIS/800deg2'
 
 # Full catalogue
 base_name_ph = 'unions.ugriz2'
@@ -126,10 +129,10 @@ base_name_ph = 'unions.ugriz2'
 # Smaller catalogue
 #base_name_ph = 'unions.ugriz_1M'
 
-cat_ph = pd.read_csv(f'{base_name_ph}.tsv', delimiter='\s+')
+cat_ph = pd.read_csv(f'{data_dir}/{base_name_ph}.tsv', delimiter='\s+')
 
 
-# In[11]:
+# In[ ]:
 
 
 print('Keys in UNIONS catalogue:')
@@ -140,21 +143,21 @@ print(f'Number of UNIONS objects = {len(cat_ph)}')
 
 # ### Match the two catalogues acording to the CFIS galaxy ID
 
-# In[12]:
+# In[ ]:
 
 
 # Transform IDs back to int
 cfis_id = data['CFIS_ID'].astype(int)
 
 
-# In[13]:
+# In[ ]:
 
 
 # Get indices of matches
 xy, x_ind, y_ind = np.intersect1d(cfis_id, cat_ph['CFIS_ID'], return_indices=True)
 
 
-# In[14]:
+# In[ ]:
 
 
 # Check
@@ -162,19 +165,19 @@ print(cfis_id[x_ind][:10])
 print(cat_ph['CFIS_ID'][y_ind][:10])
 
 
-# In[15]:
+# In[ ]:
 
 
 len(cat_ph['CFIS_ID'][y_ind])
 
 
-# In[16]:
+# In[ ]:
 
 
 len(data)
 
 
-# In[17]:
+# In[ ]:
 
 
 # Create column array for SP catalogue
@@ -189,7 +192,7 @@ for key in data_keys:
     cols.append(c)
 
 
-# In[18]:
+# In[ ]:
 
 
 # Append columns from multi-band catalogue
