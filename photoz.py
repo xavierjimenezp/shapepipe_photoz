@@ -103,30 +103,11 @@ if __name__ == "__main__":
             for i in range(len(spectral_names)):
                 cat.make_survey_catalog(spectral_path, spectral_names[i])
 
-                try: ## Compatibility for using input_path=str or None
-                    input_path = params.input_path
-                    warnings.simplefilter("always")
-                    warnings.warn("'input_path' param is deprecated, please use 'matched_path'/'unmatched_path' instead", DeprecationWarning)
-
-                    if input_path == None:
-                        path_to_tile_run = params.path_to_tile_run
-                        out_dir = os.listdir(path_to_tile_run + args.survey + '/%s/output/'%(spectral_surveys[i]))[-1]
-                        warnings.simplefilter("always")
-                        warnings.warn("'input_path = None' is deprecated, please use 'matched_path'/'unmatched_path' instead", DeprecationWarning)
-                        input_path = path_to_tile_run + args.survey + '/%s/output/%s/paste_cat_runner/output/'%(spectral_surveys[i], out_dir)
-
-                    else:
-                        input_path = params.input_path
-
-                    paste_dir = os.listdir(input_path)
-                    Parallel(n_jobs=args.nodes)(delayed(cat.make_catalog)(p, paste_dir, matched_path=input_path, unmatched_path=input_path, spectral_name=spectral_names[i], vignet=vignet) for p in tqdm(range(len(paste_dir))))
-
-                except: #Up to date version
-                    matched_path, unmatched_path = params.matched_path, params.unmatched_path
-                    paste_dir = os.listdir(matched_path)
-                    Parallel(n_jobs=args.nodes)(delayed(cat.make_matched_catalog)(p, paste_dir, matched_path=matched_path, spectral_name=spectral_names[i], vignet=vignet) for p in tqdm(range(len(paste_dir))))
-                    paste_dir = os.listdir(unmatched_path)
-                    Parallel(n_jobs=args.nodes)(delayed(cat.make_unmatched_catalog)(p, paste_dir, unmatched_path=unmatched_path, spectral_name=spectral_names[i]) for p in tqdm(range(len(paste_dir))))
+                matched_path, unmatched_path = params.matched_path, params.unmatched_path
+                paste_dir = os.listdir(matched_path)
+                Parallel(n_jobs=args.nodes)(delayed(cat.make_matched_catalog)(p, paste_dir, matched_path=matched_path, spectral_name=spectral_names[i], vignet=vignet) for p in tqdm(range(len(paste_dir))))
+                paste_dir = os.listdir(unmatched_path)
+                Parallel(n_jobs=args.nodes)(delayed(cat.make_unmatched_catalog)(p, paste_dir, unmatched_path=unmatched_path, spectral_name=spectral_names[i]) for p in tqdm(range(len(paste_dir))))
 
 
         if args.unmatched == True:
@@ -212,6 +193,9 @@ if __name__ == "__main__":
             if path_to_csv is None:
                 if args.survey == 'ps3pi_cfis':
                     path_to_csv = output_path + 'output/' + args.survey  + '/' + output_name + '/files/' + output_name + '.csv'
+                    print('MKDEBUG ', args.survey, bands, path_to_csv, output_name, output_path, cv, args.preprocess, args.nodes)
+                    import sys
+                    sys.exit(0)
                     ML = LearningAlgorithms(survey = args.survey, bands = bands, path_to_csv = path_to_csv, output_name = output_name, output_path=output_path, cv=cv, preprocessing=args.preprocess, n_jobs=args.nodes)
                     df, df_unmatched = ML.merge_cfis_r_cfht_u_medium_deep_i_g_z(morphology = params.morphological_parameters)
                     if feature_engineering == True:
@@ -518,7 +502,7 @@ if __name__ == "__main__":
         # output_name = 'CFIS_matched_SDSS_2_catalog_RUIZ'
         output_path = path
 
-        temp_path = '/n17data/jimenez/temp/'
+        temp_path = './temp/'
 
         bands = ['R', 'U', 'I', 'Z']
 
@@ -536,7 +520,6 @@ if __name__ == "__main__":
 
         elif args.make == True:
             cat = MakeCatalogs(args.survey, bands, temp_path)
-            # vignet = [False, False, False, False, False]
             for i in range(len(spectral_names)):
                 cat.make_survey_catalog(spectral_path, spectral_names[i])
                 out_dir = os.listdir("/n17data/jimenez/shaperun_unions/output_%s/"%(spectral_surveys[i]))[-1]
